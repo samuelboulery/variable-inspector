@@ -1,0 +1,192 @@
+body {
+    font-family: Inter, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    position: relative;
+    min-height: 100vh;
+    box-sizing: border-box;
+    overflow: auto;
+    min-height: 200px;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin: 1em 0 0.5em;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  .layer-section h3 {
+    margin: 0.5em 0 1em;
+    font-size: 1rem;
+    font-weight: bold;
+  }
+
+  .layer-section ul {
+    padding-left: 8px;
+    margin: 0;
+  }
+
+  .layer-section li {
+    list-style: none;
+    margin-bottom: 0.5em;
+  }
+
+  .warning {
+    background: #ffdcdc;
+    padding: 12px;
+    margin-bottom: 1em;
+    border-radius: 6px;
+    color: #B12020;
+  }
+
+  .warning h3 {
+    margin-top: 0;
+    font-size: 1rem;
+    line-height: 1rem;
+    color: #8F0000;
+  }
+
+  .resize-handle {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, #ccc 50%);
+    z-index: 1000;
+  }
+
+  .resize-handle:hover {
+    background: linear-gradient(135deg, transparent 50%, #999 50%);
+  }
+
+  /* Assure que le contenu ne cache pas la poignée */
+  #app {
+    padding-bottom: 20px;
+    margin-right: 20px;
+    min-height: 200px;
+  }
+
+  .section {
+    margin-bottom: 24px;
+  }
+
+  .section-header {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: #333;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+
+  .layer-section {
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e6e6e6;
+    padding-bottom: 16px;
+  }
+
+  .layer-section:last-child {
+    border-bottom: none;
+  }
+
+  .layer-name {
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #000;
+  }
+
+  .layer-type-label {
+    font-size: 0.8em;
+    color: #666;
+    margin-left: 0.5em;
+    font-weight: normal;
+  }
+
+  .variable-pill {
+    padding: 6px 12px 6px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 20px;
+    transition: all 0.15s ease;
+    width: fit-content;
+  }
+
+  .local-variable {
+    background-color: #e3f1ff;
+    color: #1969d2;
+  }
+
+  .external-variable {
+    background-color: #eee8ff;
+    color: #6451cf;
+  }
+
+  /* Styles pour les groupes de propriétés */
+  .property-group-title {
+    font-weight: 600;
+    margin-bottom: 0.3em;
+    display: flex;
+    align-items: center;
+  }
+
+  .property-sub-list {
+    padding-left: 1em;
+    margin: 0.3em 0 0.8em;
+  }
+
+  .property-sub-list li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.3em;
+  }
+
+  .sub-property-name {
+    width: 100px;
+    font-size: 0.9em;
+    color: #555;
+  }
+
+  /* Styles pour les propriétés principales */
+  .main-property-container {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.8em;
+  }
+
+  .main-property-name {
+    font-weight: 600;
+    margin-bottom: 0.4em;
+  }
+
+  /* Ancien style pour les icônes carrées */
+  .variable-type-icon {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 0.4em;
+    border-radius: 2px;
+  }
+
+  /* Nouveaux styles pour les icônes SVG de type */
+  .variable-type-svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .variable-type-svg-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+  }

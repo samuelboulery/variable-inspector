@@ -1,0 +1,14 @@
+{
+  "name": "variable-inspector",
+  "version": "1.0.0",
+  "scripts": {
+    "dev":   "vite build --watch",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "^4.0.0",
+    "typescript": "^5.8.3",
+    "@figma/plugin-typings": "^1.110.0",
+    "rollup-plugin-html": "^0.2.1"
+  }
+}

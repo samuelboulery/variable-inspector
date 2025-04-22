@@ -1,0 +1,14 @@
+{
+  "name": "variable-inspector",
+  "id": "com.samuelboulery.variable-inspector",
+  "main": "code.js",
+  "ui": "code.js",
+  "api": "1.0.0",
+  "editorType": [
+    "figma",
+    "dev"
+  ],
+  "permissions": [
+    "currentuser"
+  ]
+}

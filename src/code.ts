@@ -18,6 +18,7 @@ interface VariableUsage {
 
 interface UnboundUsage {
   layer: string;
+  layerId: string;
   property: string;
   value: string;
 }
@@ -72,7 +73,12 @@ const PROPERTY_NAME_VALUES = {
   FONT_FAMILY: 'Font Family',
   LETTER_SPACING: 'Letter Spacing',
   LINE_HEIGHT: 'Line Height',
-  PARAGRAPH_SPACING: 'Paragraph Spacing'
+  PARAGRAPH_SPACING: 'Paragraph Spacing',
+  PADDING_LEFT: 'Padding Left',
+  PADDING_RIGHT: 'Padding Right',
+  PADDING_TOP: 'Padding Top',
+  PADDING_BOTTOM: 'Padding Bottom',
+  ITEM_SPACING: 'Gap'
 };
 
 // Mapping des noms de propriétés
@@ -108,26 +114,6 @@ const PROPERTY_MAPPING: Record<string, string> = {
   height: 'Height',
   // Ajoutez d'autres mappings selon vos besoins
 } as const;
-
-// Inject external CSS into the UI HTML before showing
-const htmlContent = uiHtml.replace(
-  '</head>',
-  `<style>${css}</style></head>`
-);
-figma.showUI(htmlContent, {
-  width: 300,
-  height: 400,
-  title: 'Variable Inspector'
-});
-figma.ui.onmessage = (msg) => {
-  if (msg.type === 'resize') {
-    figma.ui.resize(msg.width, msg.height);
-  }
-};
-
-// Initial inspect and on selection change
-figma.on("selectionchange", updateInspector);
-updateInspector();
 
 // Set pour garder une trace des IDs de nœuds dont la taille de police a été traitée
 const processedFontSizeNodeIds = new Set<string>();
@@ -226,34 +212,55 @@ async function loadVariables(): Promise<Map<string, VariableDefinition>> {
     }
   }
 
-  // Pour chaque ID manquant, on essaie de récupérer la variable externe
+  // Pour chaque ID manquant, on récupère d'abord la variable liée au nœud
   for (const id of missingIds) {
     try {
       const variable = await figma.variables.getVariableByIdAsync(id);
       if (!variable) continue;
 
-      // Importe la variable externe via sa clé
-      const imported = await figma.variables.importVariableByKeyAsync(variable.key);
-      if (imported) {
-        let colorValue: RGB | RGBA | undefined = undefined;
-        if (imported.resolvedType === 'COLOR') {
-          const modeIds = Object.keys(imported.valuesByMode);
-          if (modeIds.length > 0) {
-            const firstModeValue = imported.valuesByMode[modeIds[0]];
-            if (typeof firstModeValue === 'object' && ('r' in firstModeValue || 'g' in firstModeValue || 'b' in firstModeValue)) {
-              colorValue = firstModeValue as RGB | RGBA;
-            }
+      // --- Fallback : on stocke toujours le nom original, même sans import publié ---
+      let colorValue: RGB | RGBA | undefined = undefined;
+      if (variable.resolvedType === 'COLOR') {
+        const modeIds = Object.keys(variable.valuesByMode);
+        if (modeIds.length > 0) {
+          const firstModeValue = variable.valuesByMode[modeIds[0]];
+          if (typeof firstModeValue === 'object' && ('r' in firstModeValue || 'g' in firstModeValue || 'b' in firstModeValue)) {
+            colorValue = firstModeValue as RGB | RGBA;
           }
         }
-        variableMap.set(id, {
-          name: imported.name,
-          type: imported.resolvedType,
-          origin: 'external',
-          colorValue: colorValue
-        });
+      }
+      variableMap.set(id, {
+        name: variable.name,            // on conserve le nom de la variable
+        type: variable.resolvedType,
+        origin: 'external',
+        colorValue: colorValue
+      });
+
+      // Si la fonction d'import est disponible, on peut écraser les infos avec la version publiée
+      if (typeof figma.variables.importVariableByKeyAsync === 'function') {
+        const imported = await figma.variables.importVariableByKeyAsync(variable.key);
+        if (imported) {
+          // On conserve la même logique pour la couleur
+          let importedColor: RGB | RGBA | undefined = undefined;
+          if (imported.resolvedType === 'COLOR') {
+            const modeIds2 = Object.keys(imported.valuesByMode);
+            if (modeIds2.length > 0) {
+              const val = imported.valuesByMode[modeIds2[0]];
+              if (typeof val === 'object' && ('r' in val || 'g' in val || 'b' in val)) {
+                importedColor = val as RGB | RGBA;
+              }
+            }
+          }
+          variableMap.set(id, {
+            name: imported.name,        // version publiée
+            type: imported.resolvedType,
+            origin: 'external',
+            colorValue: importedColor
+          });
+        }
       }
     } catch (error) {
-      console.warn(`Failed to import variable ${id}:`, error);
+      console.warn(`Impossible de récupérer la variable ${id}:`, error);
     }
   }
 
@@ -325,11 +332,14 @@ function getEffectUsages(node: SceneNode, usages: VariableUsage[]): void {
         for (const [prop, bind] of Object.entries(effect.boundVariables)) {
           const b = bind as any;
           if (b.id) {
-            const displayName = `Effect ${prop}`;
-            // Désactivation temporaire de la déduplication pour déboguer
-            // if (!trackProperty(node.id, displayName, b.id)) {
+            // Include effect type in the display name
+            const rawType = (effect.type as string) || '';
+            const friendlyType = rawType
+              .toLowerCase()
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, char => char.toUpperCase());
+            const displayName = `${friendlyType} ${prop}`;
             usages.push({ layer: node.name, property: displayName, id: b.id });
-            // }
           }
         }
       }
@@ -529,6 +539,11 @@ function collectAllNodes(nodes: readonly SceneNode[]): SceneNode[] {
   return result;
 }
 
+// Fonction utilitaire pour formater les nombres
+function formatNumber(value: number): string {
+  return Number(value.toFixed(2)).toString();
+}
+
 // Fonctions utilitaires pour la détection des usages non liés
 function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsage[]): void {
   // Fills non bindés
@@ -539,13 +554,16 @@ function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       const p = fill as any;
       const binding = p.boundVariables && p.boundVariables.color;
       if (!binding || !binding.id) {
-        const color = p.color as RGB;
-        // On ne vérifie pas la déduplication pour les fills
-        unboundUsages.push({
-          layer: node.name,
-          property: PROPERTY_NAME_VALUES.FILL,
-          value: `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`
-        });
+        if (p.color) {
+          const color = p.color as RGB;
+          // On ne vérifie pas la déduplication pour les fills
+          unboundUsages.push({
+            layer: node.name,
+            layerId: node.id,
+            property: PROPERTY_NAME_VALUES.FILL,
+            value: `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`
+          });
+        }
       }
     }
   }
@@ -560,8 +578,10 @@ function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       const p = stroke as any;
       const binding = p.boundVariables && p.boundVariables.color;
       if (!binding || !binding.id) {
-        foundFirstUnboundStroke = true;
-        firstUnboundStrokeColor = p.color as RGB;
+        if (p.color) {
+          foundFirstUnboundStroke = true;
+          firstUnboundStrokeColor = p.color as RGB;
+        }
       }
     }
 
@@ -570,6 +590,7 @@ function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       if (!trackProperty(node.id, PROPERTY_NAME_VALUES.STROKE)) {
         unboundUsages.push({
           layer: node.name,
+          layerId: node.id,
           property: PROPERTY_NAME_VALUES.STROKE,
           value: `rgb(${Math.round(firstUnboundStrokeColor.r * 255)}, ${Math.round(firstUnboundStrokeColor.g * 255)}, ${Math.round(firstUnboundStrokeColor.b * 255)})`
         });
@@ -589,17 +610,13 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
   const opBV = nodeBV && nodeBV.opacity;
   if ("opacity" in node && typeof (node as any).opacity === 'number' && (!opBV || !opBV.id)) {
     const opacity = (node as any).opacity;
-    // L'opacité n'est mentionnée que si elle est < 1 (et non liée à une variable)
     if (opacity < 1) {
-      // Crée un identifiant unique pour cette propriété
-      const propertyId = getPropertyId(node.id, PROPERTY_NAMES.OPACITY);
-
-      // Vérifie si cette propriété a déjà été traitée
       if (!trackProperty(node.id, PROPERTY_NAMES.OPACITY)) {
         unboundUsages.push({
           layer: node.name,
+          layerId: node.id,
           property: PROPERTY_NAMES.OPACITY,
-          value: opacity.toString()
+          value: formatNumber(opacity)
         });
       }
     }
@@ -621,15 +638,12 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       if (typeof sw === 'number' && sw !== 0 && !isLinked &&
         !('strokeTopWeight' in node || 'strokeBottomWeight' in node || 'strokeLeftWeight' in node || 'strokeRightWeight' in node)) {
 
-        // Crée un identifiant unique pour cette propriété
-        const propertyId = getPropertyId(node.id, PROPERTY_NAMES.STROKE_WEIGHT);
-
-        // Vérifie si cette propriété a déjà été traitée
         if (!trackProperty(node.id, PROPERTY_NAMES.STROKE_WEIGHT)) {
           unboundUsages.push({
             layer: node.name,
+            layerId: node.id,
             property: PROPERTY_NAMES.STROKE_WEIGHT,
-            value: sw.toString()
+            value: formatNumber(sw)
           });
         }
       }
@@ -643,15 +657,12 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
           if (typeof weight === 'number' && weight !== 0 && !isLinked) {
             const displayName = PROPERTY_MAPPING[prop] || prop;
 
-            // Crée un identifiant unique pour cette propriété
-            const propertyId = getPropertyId(node.id, displayName);
-
-            // Vérifie si cette propriété a déjà été traitée
             if (!trackProperty(node.id, displayName)) {
               unboundUsages.push({
                 layer: node.name,
+                layerId: node.id,
                 property: displayName,
-                value: weight.toString()
+                value: formatNumber(weight)
               });
             }
           }
@@ -669,15 +680,12 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
     if (typeof cr === 'number' && cr !== 0 && !isLinked &&
       !('topLeftRadius' in node || 'topRightRadius' in node || 'bottomLeftRadius' in node || 'bottomRightRadius' in node)) {
 
-      // Crée un identifiant unique pour cette propriété
-      const propertyId = getPropertyId(node.id, PROPERTY_NAMES.CORNER_RADIUS);
-
-      // Vérifie si cette propriété a déjà été traitée
       if (!trackProperty(node.id, PROPERTY_NAMES.CORNER_RADIUS)) {
         unboundUsages.push({
           layer: node.name,
+          layerId: node.id,
           property: PROPERTY_NAMES.CORNER_RADIUS,
-          value: cr.toString()
+          value: formatNumber(cr)
         });
       }
     }
@@ -692,15 +700,12 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       if (typeof radius === 'number' && radius !== 0 && !isLinked) {
         const displayName = PROPERTY_MAPPING[prop] || prop;
 
-        // Crée un identifiant unique pour cette propriété
-        const propertyId = getPropertyId(node.id, displayName);
-
-        // Vérifie si cette propriété a déjà été traitée
         if (!trackProperty(node.id, displayName)) {
           unboundUsages.push({
             layer: node.name,
+            layerId: node.id,
             property: displayName,
-            value: radius.toString()
+            value: formatNumber(radius)
           });
         }
       }
@@ -730,15 +735,12 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
       const boundVar = nodeBV && nodeBV[key];
       const isLinked = boundVar && boundVar.id;
 
-      // Crée un identifiant unique pour cette propriété
-      const propertyId = getPropertyId(node.id, displayName);
-
-      // Ne traiter que les valeurs numériques non nulles et non liées, et non déjà traitées
       if (typeof value === 'number' && value !== 0 && !isLinked && !trackProperty(node.id, displayName)) {
         unboundUsages.push({
           layer: node.name,
+          layerId: node.id,
           property: displayName,
-          value: value.toString()
+          value: formatNumber(value)
         });
       } else if (typeof value === 'object' && value !== null) {
         // Pour les valeurs mixtes, ne pas les signaler comme non variabilisées
@@ -770,8 +772,84 @@ function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsage[]): 
         if (!trackProperty(node.id, displayName)) {
           unboundUsages.push({
             layer: node.name,
+            layerId: node.id,
             property: displayName,
-            value: value.toString()
+            value: formatNumber(value)
+          });
+        }
+      }
+    }
+  }
+}
+
+// Detect unbound effect properties (radius, color)
+function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUsage[]): void {
+  if ("effects" in node && Array.isArray(node.effects)) {
+    for (const effect of (node.effects as any[])) {
+      const boundVars = effect.boundVariables || {};
+      const rawType = (effect.type as string) || '';
+      const friendlyType = rawType
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+
+      // Radius/Blur
+      if (typeof effect.radius === 'number') {
+        if (!boundVars.radius || !boundVars.radius.id) {
+          const propertyName = (rawType.includes('BLUR') || rawType.includes('SHADOW')) ? 'Blur' : 'Radius';
+          unboundUsages.push({
+            layer: node.name,
+            layerId: node.id,
+            property: `${friendlyType} ${propertyName}`,
+            value: formatNumber(effect.radius)
+          });
+        }
+      }
+
+      // Offset X et Y pour les ombres
+      if (rawType.includes('SHADOW') && effect.offset) {
+        const offsetBoundVars = boundVars.offset || {};
+        
+        // Offset X
+        if (typeof effect.offset.x === 'number' && (!offsetBoundVars.x || !offsetBoundVars.x.id)) {
+          unboundUsages.push({
+            layer: node.name,
+            layerId: node.id,
+            property: `${friendlyType} Offset X`,
+            value: formatNumber(effect.offset.x)
+          });
+        }
+
+        // Offset Y
+        if (typeof effect.offset.y === 'number' && (!offsetBoundVars.y || !offsetBoundVars.y.id)) {
+          unboundUsages.push({
+            layer: node.name,
+            layerId: node.id,
+            property: `${friendlyType} Offset Y`,
+            value: formatNumber(effect.offset.y)
+          });
+        }
+      }
+
+      // Spread
+      if (typeof effect.spread === 'number' && (!boundVars.spread || !boundVars.spread.id)) {
+        unboundUsages.push({
+          layer: node.name,
+          layerId: node.id,
+          property: `${friendlyType} Spread`,
+          value: formatNumber(effect.spread)
+        });
+      }
+
+      // Color (for shadows)
+      if (effect.color) {
+        if (!boundVars.color || !boundVars.color.id) {
+          const c = effect.color as RGB;
+          unboundUsages.push({
+            layer: node.name,
+            layerId: node.id,
+            property: `${friendlyType} Color`,
+            value: `rgb(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)})`
           });
         }
       }
@@ -842,47 +920,24 @@ async function updateInspector(): Promise<void> {
   // Collecte des usages de variables
   const allUsages: Array<{ layer: string; layerId: string; property: string; name: string; type: VariableResolvedDataType; origin: 'local' | 'external'; colorValue?: RGB | RGBA; id: string }> = [];
   const unboundUsages: UnboundUsage[] = [];
-  const layerInfoMap = new Map<string, LayerInfo>();
-
-  // Collecte l'information des calques et leur ordre dans l'arborescence
-  let orderCounter = 0;
-  const collectNodeInfo = (node: SceneNode, parentId?: string) => {
-    layerInfoMap.set(node.id, {
-      id: node.id,
-      name: node.name,
-      order: orderCounter++,
-      parent: parentId,
-      type: node.type
-    });
-
-    if ('children' in node && Array.isArray((node as any).children)) {
-      for (const child of (node as any).children as SceneNode[]) {
-        collectNodeInfo(child, node.id);
-      }
-    }
-  };
-
-  // Collecte l'info sur tous les nœuds, pas seulement les sélectionnés 
-  // pour avoir l'information de tous les calques
-  for (const node of allNodes) {
-    // S'assurer que ce nœud est dans la map (s'il n'a pas été ajouté comme enfant)
-    if (!layerInfoMap.has(node.id)) {
-      // Trouver le parent si c'est un enfant d'un nœud déjà traité
-      let parentId: string | undefined = undefined;
-      if ('parent' in node && node.parent && 'id' in node.parent) {
-        parentId = (node.parent as any).id;
-      }
-      collectNodeInfo(node, parentId);
-    }
-  }
 
   for (const node of allNodes) {
     const nodeUsages = inspectNode(node);
     for (const { layer, property, id } of nodeUsages) {
       const def = vars.get(id);
-      if (!def) continue;
-
-      // N'appliquer la déduplication qu'au niveau de la vue finale, pas lors de la collection
+      if (!def) {
+        // Variable provenant d'un autre fichier : on l'affiche malgré tout
+        allUsages.push({
+          layer: layer,
+          layerId: node.id,
+          property: property,
+          name: id,           // on affiche l'ID en guise de nom
+          type: 'STRING',     // type par défaut pour les variables inconnues
+          origin: 'external', // style pill externe
+          id: id
+        });
+        continue;
+      }
       allUsages.push({
         layer,
         layerId: node.id,
@@ -894,12 +949,78 @@ async function updateInspector(): Promise<void> {
         id: id
       });
     }
-
     getUnboundColorUsages(node, unboundUsages);
     getUnboundFloatUsages(node, unboundUsages);
+    getUnboundEffectUsages(node, unboundUsages);
   }
 
-  // Regroupement final par calque avec déduplication
+  // Création d'une map d'information des calques basée sur les usages
+  const layerInfoMap = new Map<string, LayerInfo>();
+  allUsages.forEach((u, idx) => {
+    if (!layerInfoMap.has(u.layerId)) {
+      const node = figma.getNodeById(u.layerId) as SceneNode | null;
+      if (node) {
+        let layerType: string = 'UNKNOWN';
+        // Prioritize component & instance types over auto-layout
+        if (node.type === 'COMPONENT' || node.type === 'INSTANCE') {
+          layerType = node.type;
+        } else if ('layoutMode' in node) {
+          const frame = node as FrameNode;
+          if (frame.layoutWrap === 'WRAP') {
+            layerType = 'AUTO_WRAP';
+          } else if (frame.layoutMode === 'HORIZONTAL') {
+            layerType = 'AUTO_HORIZONTAL';
+          } else if (frame.layoutMode === 'VERTICAL') {
+            layerType = 'AUTO_VERTICAL';
+          } else {
+            layerType = node.type;
+          }
+        } else {
+          layerType = node.type;
+        }
+        layerInfoMap.set(u.layerId, {
+          id: u.layerId,
+          name: u.layer,
+          order: idx,
+          type: layerType
+        });
+      }
+    }
+  });
+
+  // Ajouter aussi les calques n'ayant que des propriétés non variabilisées
+  unboundUsages.forEach((u, idx) => {
+    if (!layerInfoMap.has(u.layerId)) {
+      const node = figma.getNodeById(u.layerId) as SceneNode | null;
+      if (node) {
+        let layerType: string = 'UNKNOWN';
+        if (node.type === 'COMPONENT' || node.type === 'INSTANCE') {
+          layerType = node.type;
+        } else if ('layoutMode' in node) {
+          const frame = node as FrameNode;
+          if (frame.layoutWrap === 'WRAP') {
+            layerType = 'AUTO_WRAP';
+          } else if (frame.layoutMode === 'HORIZONTAL') {
+            layerType = 'AUTO_HORIZONTAL';
+          } else if (frame.layoutMode === 'VERTICAL') {
+            layerType = 'AUTO_VERTICAL';
+          } else {
+            layerType = node.type;
+          }
+        } else {
+          layerType = node.type;
+        }
+        layerInfoMap.set(u.layerId, {
+          id: u.layerId,
+          name: u.layer,
+          order: allUsages.length + idx,
+          type: layerType
+        });
+      }
+    }
+  });
+
+  // Regroupe les usages par couche
   const byLayer = groupUsagesByLayer(allUsages);
 
   // Log pour déboguer
@@ -918,5 +1039,44 @@ async function updateInspector(): Promise<void> {
     layerInfoMap: Object.fromEntries(layerInfoMap),
     noVariablesFound: noVariablesFound
   });
+
 }
+
+// Initialisation du plugin
+function initializePlugin() {
+  figma.showUI(uiHtml.replace(
+    '</head>',
+    `<style>${css}</style></head>`
+  ), {
+    width: 300,
+    height: 400,
+    title: 'Variable Inspector'
+  });
+
+  // Gestion des messages UI (resize, sélection de nœud)
+  figma.ui.onmessage = (msg) => {
+    if (msg.type === 'resize') {
+      // Redimensionnement de la fenêtre du plugin
+      figma.ui.resize(msg.width, msg.height);
+    } else if (msg.type === 'select-node') {
+      // Sélectionner et centrer le nœud dans Figma
+      const node = figma.getNodeById(msg.nodeId) as SceneNode | null;
+      if (node) {
+        figma.currentPage.selection = [node];
+        figma.viewport.scrollAndZoomIntoView([node]);
+      }
+    }
+  };
+
+  // Réagir aux changements de sélection
+  figma.on("selectionchange", () => {
+    updateInspector().catch(err => console.error('updateInspector error', err));
+  });
+
+  // Initial inspection
+  updateInspector().catch(err => console.error('updateInspector error', err));
+}
+
+// Démarrer le plugin une fois que tout est chargé
+initializePlugin();
 

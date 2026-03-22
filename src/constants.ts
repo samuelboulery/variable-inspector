@@ -58,12 +58,11 @@ export const PROPERTY_MAPPING: Record<string, string> = {
   height: 'Height',
 } as const;
 
-/** Spacing property keys that must never be deduplicated. */
+/** Spacing property display names that must never be deduplicated. */
 export const SPACING_PROPERTY_KEYS = [
-  'paddingLeft',
-  'paddingRight',
-  'paddingTop',
-  'paddingBottom',
-  'itemSpacing',
-  'gap',
+  'Padding Left',
+  'Padding Right',
+  'Padding Top',
+  'Padding Bottom',
+  'Gap',
 ] as const;

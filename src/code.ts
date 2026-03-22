@@ -11,19 +11,6 @@ import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } 
 import { logger } from './utils/logger';
 
 /**
- * Formats a number to at most 2 decimal places, removing trailing zeros.
- *
- * @param value - The numeric value to format.
- * @returns Formatted string representation.
- */
-function formatNumber(value: number): string {
-  return Number(value.toFixed(2)).toString();
-}
-
-// formatNumber is used by unboundDetector; keep it exported-accessible via the module
-export { formatNumber };
-
-/**
  * Determines the display layer type for a scene node.
  * Prioritises COMPONENT/INSTANCE, then auto-layout orientation, then raw node type.
  *

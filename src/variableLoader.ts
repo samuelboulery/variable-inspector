@@ -1,8 +1,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 import { VariableDefinition } from './types';
-import { inspectNode } from './nodeScanner';
-import { collectAllNodes } from './nodeScanner';
+import { inspectNode, collectAllNodes } from './nodeScanner';
 import { logger } from './utils/logger';
 
 /**
@@ -109,7 +108,7 @@ async function loadExternalVariables(variableMap: Map<string, VariableDefinition
         }
       }
     } catch (error) {
-      logger.warn(`Impossible de récupérer la variable ${id}:`, error);
+      logger.warn(`Failed to resolve variable ${id}:`, error);
     }
   }
 }

@@ -72,7 +72,7 @@ export function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsa
         value: rgbString(firstUnbound),
       });
       if (node.strokes.length > 1) {
-        logger.log(`${node.name} a ${node.strokes.length} contours, seul le premier non lié est affiché`);
+        logger.log(`${node.name} has ${node.strokes.length} strokes, only the first unbound one is shown`);
       }
     }
   }

@@ -58,7 +58,7 @@ function getColorUsages(node: SceneNode, usages: VariableUsage[]): void {
     const firstId = Array.from(fillVariableIds)[0];
     usages.push({ layer: node.name, property: PROPERTY_NAMES.FILL, id: firstId });
     if (fillVariableIds.size > 1) {
-      logger.log(`${node.name} a ${fillVariableIds.size} variables de remplissage, seule la première est affichée`);
+      logger.log(`${node.name} has ${fillVariableIds.size} fill variables, only the first is shown`);
     }
   }
 }

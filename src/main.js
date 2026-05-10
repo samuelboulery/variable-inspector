@@ -44,6 +44,32 @@ function renderToolbar(onSortChange) {
   return toolbar;
 }
 
+/**
+ * Creates and returns the stats dashboard element.
+ *
+ * @param {object} stats - Statistics object with counts and coverage metrics.
+ * @returns {HTMLElement} The stats dashboard div element.
+ */
+function renderStats(stats) {
+  const dashboard = document.createElement('div');
+  dashboard.className = 'stats-dashboard';
+  const coveragePct = Math.round(stats.variableCoverage * 100);
+  dashboard.innerHTML = `
+    <div class="stats-line">
+      <strong>${stats.totalVariables}</strong> variables
+      • <strong>${stats.totalHardcoded}</strong> hardcoded (${100 - coveragePct}%)
+    </div>
+    <div class="stats-line">
+      <strong>${stats.byOrigin.local}</strong> local • <strong>${stats.byOrigin.external}</strong> external
+    </div>
+    <div class="stats-bar">
+      <div class="stats-bar-fill" style="width: ${coveragePct}%"></div>
+      <span class="stats-bar-label">Coverage : ${coveragePct}%</span>
+    </div>
+  `;
+  return dashboard;
+}
+
 let lastMessage = null;
 
 /**
@@ -55,6 +81,8 @@ function handleRenderMessage(message) {
   lastMessage = message;
   const app = document.getElementById('app');
   app.innerHTML = '';
+
+  if (message.stats) app.appendChild(renderStats(message.stats));
 
   app.appendChild(renderToolbar(() => renderBody(app, lastMessage)));
 

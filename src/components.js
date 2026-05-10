@@ -101,6 +101,24 @@ export function createLayerSection(layerInfo, variables) {
   layerName.textContent = layerInfo.name;
   headerContent.appendChild(layerName);
 
+  if (layerInfo.count && layerInfo.count > 1) {
+    const badge = document.createElement('span');
+    badge.className = 'merge-badge';
+    badge.textContent = `× ${layerInfo.count}`;
+    badge.title = 'Click to cycle through merged instances';
+    badge.dataset.cycleIndex = '0';
+    badge.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const ids = layerInfo.mergedNodeIds || [];
+      if (ids.length === 0) return;
+      let idx = parseInt(badge.dataset.cycleIndex, 10) || 0;
+      parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: ids[idx] } }, '*');
+      idx = (idx + 1) % ids.length;
+      badge.dataset.cycleIndex = String(idx);
+    });
+    headerContent.appendChild(badge);
+  }
+
   header.appendChild(headerContent);
 
   const selectIcon = document.createElement('div');

@@ -113,12 +113,25 @@ export function formatEffectType(effectType: string): string {
  */
 function getEffectUsages(node: SceneNode, usages: VariableUsage[]): void {
   if (!('effects' in node) || !Array.isArray(node.effects)) return;
-  for (const effect of node.effects as EffectWithBindings[]) {
+  const effects = node.effects as EffectWithBindings[];
+  const counts: Record<string, number> = {};
+  for (const e of effects) counts[e.type] = (counts[e.type] ?? 0) + 1;
+  const seenIdx: Record<string, number> = {};
+
+  for (const effect of effects) {
     if (!effect.boundVariables) continue;
+    const total = counts[effect.type];
+    seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
+    const idx = seenIdx[effect.type];
+    const baseLabel = formatEffectType(effect.type);
+    const friendlyType = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
     for (const [prop, bind] of Object.entries(effect.boundVariables)) {
-      if (bind.id) {
-        const displayName = `${formatEffectType(effect.type)} ${prop}`;
-        usages.push({ layer: getLayerDisplayName(node), property: displayName, id: bind.id });
+      if ((bind as { id?: string }).id) {
+        usages.push({
+          layer: getLayerDisplayName(node),
+          property: `${friendlyType} ${prop}`,
+          id: (bind as { id: string }).id,
+        });
       }
     }
   }

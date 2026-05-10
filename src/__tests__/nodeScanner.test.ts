@@ -213,6 +213,32 @@ describe('inspectNode', () => {
     expect(props).toContain('Stroke Color');
     expect(props).toContain('Corner Radius');
   });
+
+  it('numbers repeated bound drop-shadow radii', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      name: 'Card',
+      effects: [
+        { type: 'DROP_SHADOW', boundVariables: { radius: { id: 'var-r1' } } },
+        { type: 'DROP_SHADOW', boundVariables: { radius: { id: 'var-r2' } } },
+      ],
+    });
+    const usages = inspectNode(node);
+    const props = usages.map(u => u.property);
+    expect(props).toContain('Drop Shadow 1 radius');
+    expect(props).toContain('Drop Shadow 2 radius');
+  });
+
+  it('does not number when only one effect of that type is bound', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      name: 'Card',
+      effects: [{ type: 'LAYER_BLUR', boundVariables: { radius: { id: 'var-r' } } }],
+    });
+    const usages = inspectNode(node);
+    expect(usages.find(u => u.property === 'Layer Blur radius')).toBeDefined();
+    expect(usages.find(u => u.property === 'Layer Blur 1 radius')).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

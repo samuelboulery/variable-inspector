@@ -12,3 +12,10 @@ graphify-out/
 
 # Build artifact noise (keep dist/code.js + dist/manifest.json tracked)
 dist/.DS_Store
+
+# Local workaround for stale Figma plugin imports that point at public/manifest.json
+# instead of dist/manifest.json. The real entry is dist/manifest.json.
+public/code.js
+
+# Coverage reports
+coverage/

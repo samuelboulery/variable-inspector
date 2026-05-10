@@ -1,11 +1,27 @@
 /// <reference types="@figma/plugin-typings" />
 
+/** Resolved structural path to a variable, surfaced for Feature 3. */
+export interface VariablePath {
+  collection: string;
+  /** Library name when the variable is external. */
+  library?: string;
+  /** Group segments (Figma uses "/" in variable names as group separator). */
+  groups: string[];
+  /** Final variable name (last segment). */
+  name: string;
+  /** True when path resolution traversed at least one VARIABLE_ALIAS. */
+  isAlias: boolean;
+  /** Names visited during alias resolution (debug only). */
+  aliasChain?: string[];
+}
+
 /** Resolved definition of a Figma variable after loading from collections. */
 export interface VariableDefinition {
   name: string;
   type: VariableResolvedDataType;
   origin: 'local' | 'external';
   colorValue?: RGB | RGBA;
+  path?: VariablePath;
 }
 
 /** A single bound-variable usage found on a node's property. */
@@ -40,6 +56,7 @@ export interface FullUsageEntry {
   origin: 'local' | 'external';
   colorValue?: RGB | RGBA;
   id: string;
+  path?: VariablePath;
 }
 
 /** Metadata about a layer node sent to the UI. */

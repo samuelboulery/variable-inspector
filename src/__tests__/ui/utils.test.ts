@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { regroupByProperty } from '../../ui/utils';
+import { regroupByProperty, computeStats } from '../../ui/utils';
 import { FullUsageEntry } from '../../types';
 
 function entry(overrides: Partial<FullUsageEntry>): FullUsageEntry {
@@ -29,5 +29,36 @@ describe('regroupByProperty', () => {
 
   it('returns empty object for empty input', () => {
     expect(regroupByProperty({})).toEqual({});
+  });
+});
+
+describe('computeStats', () => {
+  it('returns zero stats for empty input', () => {
+    const s = computeStats({}, [], 5);
+    expect(s.totalVariables).toBe(0);
+    expect(s.totalHardcoded).toBe(0);
+    expect(s.variableCoverage).toBe(0);
+    expect(s.scanDurationMs).toBe(5);
+  });
+
+  it('counts variables by origin and type', () => {
+    const byLayer = {
+      l1: [
+        entry({ origin: 'local', type: 'COLOR' }),
+        entry({ origin: 'external', type: 'FLOAT' }),
+      ],
+    };
+    const s = computeStats(byLayer, [], 0);
+    expect(s.totalVariables).toBe(2);
+    expect(s.byOrigin).toEqual({ local: 1, external: 1 });
+    expect(s.byType.COLOR).toBe(1);
+    expect(s.byType.FLOAT).toBe(1);
+  });
+
+  it('calculates coverage as bound / (bound + hardcoded)', () => {
+    const byLayer = { l1: [entry({}), entry({}), entry({}), entry({})] };
+    const unbound = [{ layer: 'a', layerId: 'l1', property: 'Fill', value: 'rgb(0,0,0)' }];
+    const s = computeStats(byLayer, unbound, 0);
+    expect(s.variableCoverage).toBeCloseTo(4 / 5);
   });
 });

@@ -115,3 +115,15 @@ export type UIToPluginMessage = SelectNodeMessage | ResizeMessage;
 
 /** Sort modes for the UI's main rendering. */
 export type SortMode = 'byLayer' | 'byProperty';
+
+/** Aggregate statistics computed by the plugin and rendered in the UI dashboard. */
+export interface ScanStats {
+  totalVariables: number;
+  totalHardcoded: number;
+  /** 0..1 ratio of bound vs (bound + hardcoded). */
+  variableCoverage: number;
+  byOrigin: { local: number; external: number };
+  byType: { COLOR: number; FLOAT: number; STRING: number; BOOLEAN: number };
+  layerCount: number;
+  scanDurationMs: number;
+}

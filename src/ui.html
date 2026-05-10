@@ -166,7 +166,7 @@
     function getSortMode() {
       try {
         const v = localStorage.getItem(SORT_KEY);
-        if (v === 'byProperty' || v === 'byLayer') return v;
+        if (v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
       } catch (_) { /* data: URL — fallback below */ }
       return sortModeMemory;
     }
@@ -705,6 +705,7 @@
           <div class="fg-seg">
             <button data-mode="byLayer">Calque</button>
             <button data-mode="byProperty">Propriété</button>
+            <button data-mode="unbound">Unbound</button>
           </div>
           <span style="flex:1"></span>
           <button class="fg-filter-btn" data-expanded="${expanded ? 'true' : 'false'}" aria-expanded="${expanded ? 'true' : 'false'}">
@@ -839,93 +840,96 @@
 
     // Rendu alternatif "Par propriété" : flatten bound entries across layers,
     // groupe par property name, rend chaque property en section flat avec
-    // rows "[layer] → [pill]". Unbound idem sous une danger section.
+    // rows "[layer] → [pill]". Mixes bound + unbound entries under the same
+    // property heading — pill style (.variable-pill vs .unbound-variable)
+    // is the only visual differentiator. No more separate .danger section.
     function renderByPropertyMode(container, msg, unboundMap) {
       const { byLayer, layerInfoMap } = msg;
-      const allBound = [];
-      for (const layerName of Object.keys(byLayer || {})) {
-        for (const entry of byLayer[layerName] || []) {
-          allBound.push(entry);
+
+      // Build a single property → entries map mixing bound + unbound.
+      // Each entry is { kind: 'bound' | 'unbound', ...payload }. Stable order:
+      // bound first (in original byLayer order), then unbound.
+      const byProp = {};
+      const propKey = (effectGroup, subProp, property) =>
+        effectGroup ? `${effectGroup} / ${subProp || property}` : property;
+
+      for (const layerKey of Object.keys(byLayer || {})) {
+        for (const entry of byLayer[layerKey] || []) {
+          const key = propKey(entry.effectGroup, entry.subProp, entry.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'bound', entry });
+        }
+      }
+      for (const layerName of Object.keys(unboundMap || {})) {
+        for (const u of unboundMap[layerName] || []) {
+          const key = propKey(u.effectGroup, u.subProp, u.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'unbound', entry: { ...u, layer: layerName } });
         }
       }
 
-      if (allBound.length === 0) {
+      const propNames = Object.keys(byProp).sort();
+      if (propNames.length === 0) {
         const empty = document.createElement('div');
         empty.style.padding = '2rem';
         empty.style.textAlign = 'center';
-        empty.style.color = '#666';
-        empty.textContent = 'Aucune variable bound dans la sélection.';
+        empty.style.color = 'var(--fg-text-secondary)';
+        empty.textContent = 'Aucune propriété à afficher.';
         container.appendChild(empty);
-      } else {
-        const byProp = {};
-        for (const e of allBound) {
-          const key = e.property;
-          if (!byProp[key]) byProp[key] = [];
-          byProp[key].push(e);
-        }
-        const propNames = Object.keys(byProp).sort();
-        for (const prop of propNames) {
-          const section = document.createElement('div');
-          section.className = 'property-section';
-          const h = document.createElement('h2');
-          h.textContent = `${prop} (${byProp[prop].length})`;
-          section.appendChild(h);
-          for (const entry of byProp[prop]) {
-            const row = document.createElement('div');
-            row.className = 'property-row';
-            const layerLabel = document.createElement('span');
-            layerLabel.className = 'property-row-layer';
-            const li = layerInfoMap && layerInfoMap[entry.layerId];
-            layerLabel.textContent = (li && li.name) || entry.layer;
-            layerLabel.style.cursor = 'pointer';
-            layerLabel.addEventListener('click', () => {
-              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: entry.layerId } }, '*');
-            });
-            row.appendChild(layerLabel);
-            row.appendChild(document.createTextNode(' → '));
-            row.appendChild(createVariablePill(entry));
-            section.appendChild(row);
-          }
-          container.appendChild(section);
-        }
+        return;
       }
 
-      // Unbound flat list groupée par property name
-      const flatUnbound = [];
-      for (const layerName of Object.keys(unboundMap || {})) {
-        for (const u of unboundMap[layerName] || []) {
-          flatUnbound.push({ ...u, layer: layerName });
-        }
-      }
-      if (flatUnbound.length > 0) {
-        const danger = document.createElement('div');
-        danger.className = 'danger';
-        const t = document.createElement('h3');
-        t.textContent = '🚨 Non‑variabilisé';
-        danger.appendChild(t);
-        const byProp = {};
-        for (const u of flatUnbound) {
-          const key = u.effectGroup ? `${u.effectGroup} / ${u.subProp || u.property}` : u.property;
-          if (!byProp[key]) byProp[key] = [];
-          byProp[key].push(u);
-        }
-        const ul = document.createElement('ul');
-        Object.keys(byProp).sort().forEach(prop => {
-          const li = document.createElement('li');
-          const propEl = createPropertyElement(prop);
-          li.appendChild(propEl);
-          byProp[prop].forEach(u => {
+      for (const prop of propNames) {
+        const section = document.createElement('div');
+        section.className = 'property-section';
+        const h = document.createElement('h2');
+        h.textContent = `${prop} (${byProp[prop].length})`;
+        section.appendChild(h);
+        for (const row of byProp[prop]) {
+          const rowEl = document.createElement('div');
+          rowEl.className = 'property-row';
+
+          const layerLabel = document.createElement('span');
+          layerLabel.className = 'property-row-layer';
+          let layerId = '';
+          let layerText = '';
+          if (row.kind === 'bound') {
+            layerId = row.entry.layerId;
+            const li = layerInfoMap && layerInfoMap[layerId];
+            layerText = (li && li.name) || row.entry.layer;
+          } else {
+            layerText = row.entry.layer;
+            // Unbound entries don't carry layerId in unboundMap — resolve via
+            // first layerInfoMap entry whose name matches (best-effort).
+            if (layerInfoMap) {
+              for (const [id, info] of Object.entries(layerInfoMap)) {
+                if (info.name === layerText) { layerId = id; break; }
+              }
+            }
+          }
+          layerLabel.textContent = layerText;
+          if (layerId) {
+            layerLabel.style.cursor = 'pointer';
+            layerLabel.addEventListener('click', () => {
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: layerId } }, '*');
+            });
+          }
+          rowEl.appendChild(layerLabel);
+          rowEl.appendChild(document.createTextNode(' → '));
+
+          if (row.kind === 'bound') {
+            rowEl.appendChild(createVariablePill(row.entry));
+          } else {
             const pill = document.createElement('span');
             pill.className = 'variable-pill unbound-variable';
             const v = document.createElement('span');
-            v.textContent = `${u.layer} = ${u.value}`;
+            v.textContent = String(row.entry.value);
             pill.appendChild(v);
-            li.appendChild(pill);
-          });
-          ul.appendChild(li);
-        });
-        danger.appendChild(ul);
-        container.appendChild(danger);
+            rowEl.appendChild(pill);
+          }
+          section.appendChild(rowEl);
+        }
+        container.appendChild(section);
       }
     }
 
@@ -1037,9 +1041,16 @@
         return;
       }
 
-      // Sort mode : "byProperty" rend une vue alternative flat par property.
-      // "byLayer" (défaut) garde le flow historique ci-dessous.
-      if (getSortMode() === 'byProperty') {
+      // Sort mode dispatch :
+      //  - 'unbound'    : filtre bound out, layout flat par property (uniquement unbound)
+      //  - 'byProperty' : layout flat par property (bound + unbound mélangés)
+      //  - 'byLayer'    : flow historique ci-dessous (bound + unbound par calque)
+      const mode = getSortMode();
+      if (mode === 'unbound') {
+        renderByPropertyMode(container, { ...msg, byLayer: {} }, unboundMap);
+        return;
+      }
+      if (mode === 'byProperty') {
         renderByPropertyMode(container, { ...msg, byLayer }, unboundMap);
         return;
       }
@@ -1177,8 +1188,8 @@
           selectIcon.className = "select-icon";
           selectIcon.innerHTML = `
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="black"/>
-              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="black"/>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="currentColor"/>
+              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="currentColor"/>
             </svg>
           `;
           selectIcon.title = "Sélectionner ce calque";
@@ -1200,21 +1211,12 @@
           const normalUnboundItems = unboundSplit.normal;
           const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
 
-          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          // Propriétés non variabilisées (hors effets) : rendues inline dans
+          // la layer-section comme les bound rows. Plus de wrapper .danger —
+          // la pill .unbound-variable porte déjà l'identité rouge.
           if (normalUnboundItems && normalUnboundItems.length > 0) {
-            // Grouper aussi les propriétés non liées
             const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
-
-            const warn = document.createElement("div");
-            warn.className = "danger";
-            const wt = document.createElement("h3");
-            wt.appendChild(document.createTextNode("🚨 Non‑variabilisé"));
-            warn.appendChild(wt);
-
-            // Utiliser la fonction renderItemsList pour les éléments non liés
-            const ulWarn = renderItemsList(groupedUnboundItems, true);
-            warn.appendChild(ulWarn);
-            section.appendChild(warn);
+            section.appendChild(renderItemsList(groupedUnboundItems, true));
           }
 
           // Ajouter les variables liées s'il y en a (hors effets)

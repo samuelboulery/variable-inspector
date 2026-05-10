@@ -153,7 +153,7 @@ export interface RescanMessage {
 export type UIToPluginMessage = SelectNodeMessage | ResizeMessage | RescanMessage;
 
 /** Sort modes for the UI's main rendering. */
-export type SortMode = 'byLayer' | 'byProperty';
+export type SortMode = 'byLayer' | 'byProperty' | 'unbound';
 
 /** Aggregate statistics computed by the plugin and rendered in the UI dashboard. */
 export interface ScanStats {

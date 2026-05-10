@@ -2,15 +2,16 @@
   "name": "variable-inspector",
   "version": "1.0.0",
   "scripts": {
-    "dev":        "vite build --watch",
-    "build":      "vite build",
-    "typecheck":  "tsc --noEmit",
-    "test":       "vitest run",
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "test:watch": "vitest",
-    "test:cov":   "vitest run --coverage"
+    "test:cov": "vitest run --coverage"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.110.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "typescript": "^5.8.3",
     "vite": "^4.0.0",
     "vitest": "^1.6.1"

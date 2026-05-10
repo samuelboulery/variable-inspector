@@ -52,6 +52,10 @@ export interface LayerInfo {
   parent?: string;
   /** Figma node type string (e.g. "FRAME", "AUTO_HORIZONTAL", "COMPONENT"). */
   type: string;
+  /** Number of merged identical instances (>= 2 when merged, undefined when solo). */
+  count?: number;
+  /** All node IDs that share this fingerprint, in document order. */
+  mergedNodeIds?: string[];
 }
 
 // ---------------------------------------------------------------------------

@@ -348,3 +348,54 @@ li {
     transform: translateY(0);
   }
 }
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  margin: -1rem -1rem 1rem -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  z-index: 10;
+}
+
+.sort-toggle {
+  display: inline-flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sort-toggle button {
+  background: #fff;
+  border: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+}
+
+.sort-toggle button:last-child { border-right: none; }
+.sort-toggle button.active { background: #1969d2; color: #fff; }
+
+.property-section {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e6e6e6;
+  padding-bottom: 12px;
+}
+
+.property-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.property-row-layer {
+  color: #1969d2;
+}
+
+.property-row-layer:hover { text-decoration: underline; }

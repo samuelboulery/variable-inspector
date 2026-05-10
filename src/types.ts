@@ -105,6 +105,13 @@ export interface RenderMessage {
   byLayer: Record<string, FullUsageEntry[]>;
   unbound: UnboundUsage[];
   layerInfoMap: Record<string, LayerInfo>;
+  /**
+   * INSTANCE node IDs grouped by display name. Lets the UI surface a × N
+   * badge for any layer whose name appears on >= 2 INSTANCE nodes, even
+   * when the plugin-side fingerprint did not merge them (e.g. instances
+   * carrying different boundVariables or variant props).
+   */
+  instancesByName: Record<string, string[]>;
   noVariablesFound: boolean;
   stats: ScanStats;
   scanDurationMs: number;

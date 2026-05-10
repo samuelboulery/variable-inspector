@@ -7,6 +7,7 @@ import { SPACING_PROPERTY_KEYS } from './constants';
 import { resetDedupSets } from './dedup';
 import { loadVariables } from './variableLoader';
 import { inspectNode, collectAllNodes } from './nodeScanner';
+import { getLayerDisplayName } from './utils/displayName';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
 import { groupByFingerprint } from './instanceFingerprint';
 import { collectMergedAwayDescendantIds } from './mergedInstanceExclusion';
@@ -193,6 +194,20 @@ async function runInspector(): Promise<void> {
   const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages, mergedInfo);
   const byLayer = groupUsagesByLayer(allUsages);
 
+  // Count INSTANCE nodes grouped by display name — independent of the
+  // fingerprint-based merge above. The UI uses this as a fallback to render
+  // the × N badge for layers whose instances do not share a fingerprint
+  // (e.g. different boundVariables on each instance) but still resolve to
+  // the same display name from the user's perspective.
+  const instancesByName: Record<string, string[]> = {};
+  for (const node of allNodes) {
+    if (node.type !== 'INSTANCE') continue;
+    const name = getLayerDisplayName(node);
+    const list = instancesByName[name] ?? [];
+    list.push(node.id);
+    instancesByName[name] = list;
+  }
+
   logger.log('Final usages count:', allUsages.length);
   logger.log('Layers with variables:', Object.keys(byLayer).length);
   logger.log('Unbound usages count:', unboundUsages.length);
@@ -206,6 +221,7 @@ async function runInspector(): Promise<void> {
     byLayer,
     unbound: unboundUsages,
     layerInfoMap: Object.fromEntries(layerInfoMap),
+    instancesByName,
     noVariablesFound: allUsages.length === 0 && unboundUsages.length === 0,
     stats,
     scanDurationMs,

@@ -625,7 +625,7 @@
     // --- window.onmessage handler moved below all definitions ---
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
-      const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
+      const { byLayer, unbound, layerInfoMap, instancesByName, noVariablesFound } = msg;
       // Dedup unbound entries within each layer name by
       // (effectGroup, subProp, property, value) tuple. Multiple identical
       // instances of a component (whether or not the plugin merged them via
@@ -766,20 +766,26 @@
           title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
-          // Badge × N pour les instances mergées (cycle entre les nodes au clic)
-          if (layerInfo && layerInfo.count && layerInfo.count > 1) {
+          // Badge × N : prend les IDs du fingerprint-merge (layerInfo.mergedNodeIds)
+          // s'il existe, sinon retombe sur instancesByName[displayName] — qui
+          // compte les INSTANCE nodes partageant le même nom même quand leurs
+          // fingerprints diffèrent (boundVars/variants/copies).
+          const displayName = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
+          let cycleIds = (layerInfo && layerInfo.mergedNodeIds) || [];
+          if (cycleIds.length <= 1 && instancesByName && instancesByName[displayName]) {
+            cycleIds = instancesByName[displayName];
+          }
+          if (cycleIds.length > 1) {
             const badge = document.createElement('span');
             badge.className = 'merge-badge';
-            badge.textContent = `× ${layerInfo.count}`;
-            badge.title = 'Cliquer pour cycler entre les instances fusionnées';
+            badge.textContent = `× ${cycleIds.length}`;
+            badge.title = 'Cliquer pour cycler entre les instances identiques';
             badge.dataset.cycleIndex = '0';
             badge.addEventListener('click', (ev) => {
               ev.stopPropagation();
-              const ids = layerInfo.mergedNodeIds || [];
-              if (ids.length === 0) return;
               let idx = parseInt(badge.dataset.cycleIndex, 10) || 0;
-              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: ids[idx] } }, '*');
-              idx = (idx + 1) % ids.length;
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: cycleIds[idx] } }, '*');
+              idx = (idx + 1) % cycleIds.length;
               badge.dataset.cycleIndex = String(idx);
             });
             hcontent.appendChild(badge);

@@ -4,7 +4,8 @@ import { UnboundUsage } from './types';
 import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
 import { trackProperty } from './dedup';
 import { processedFontSizeNodeIds } from './dedup';
-import { formatEffectType, getLayerDisplayName } from './nodeScanner';
+import { formatEffectType } from './nodeScanner';
+import { getLayerDisplayName } from './utils/displayName';
 import { logger } from './utils/logger';
 
 /** Formats a number to at most 2 decimal places, removing trailing zeros. */
@@ -24,15 +25,6 @@ type NodeWithBindings = SceneNode & {
   boundVariables?: Record<string, { id?: string }>;
   [key: string]: unknown;
 };
-
-interface EffectWithBindings {
-  type: string;
-  radius?: number;
-  spread?: number;
-  offset?: { x: number; y: number };
-  color?: RGB;
-  boundVariables?: Record<string, { id?: string } | { x?: { id?: string }; y?: { id?: string } }>;
-}
 
 /**
  * Detects unbound fill and stroke colors on a node.
@@ -245,75 +237,6 @@ export function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsa
   getUnboundSpacingUsages(n, unboundUsages);
 }
 
-/**
- * Detects unbound effect properties (blur radius, shadow offset, spread, color) on a node.
- *
- * @param node - The scene node to check.
- * @param unboundUsages - Array to append found unbound usages to.
- */
-export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUsage[]): void {
-  if (!('effects' in node) || !Array.isArray(node.effects)) return;
-
-  for (const effect of node.effects as EffectWithBindings[]) {
-    const boundVars = effect.boundVariables ?? {};
-    const friendlyType = formatEffectType(effect.type);
-    const isBlurOrShadow = effect.type.includes('BLUR') || effect.type.includes('SHADOW');
-
-    if (typeof effect.radius === 'number') {
-      const radiusBound = boundVars.radius as { id?: string } | undefined;
-      if (!radiusBound?.id) {
-        const label = isBlurOrShadow ? 'Blur' : 'Radius';
-        unboundUsages.push({
-          layer: getLayerDisplayName(node),
-          layerId: node.id,
-          property: `${friendlyType} ${label}`,
-          value: fmt(effect.radius),
-        });
-      }
-    }
-
-    if (effect.type.includes('SHADOW') && effect.offset) {
-      const offsetBound = (boundVars.offset as { x?: { id?: string }; y?: { id?: string } }) ?? {};
-      if (typeof effect.offset.x === 'number' && !offsetBound.x?.id) {
-        unboundUsages.push({
-          layer: getLayerDisplayName(node),
-          layerId: node.id,
-          property: `${friendlyType} Offset X`,
-          value: fmt(effect.offset.x),
-        });
-      }
-      if (typeof effect.offset.y === 'number' && !offsetBound.y?.id) {
-        unboundUsages.push({
-          layer: getLayerDisplayName(node),
-          layerId: node.id,
-          property: `${friendlyType} Offset Y`,
-          value: fmt(effect.offset.y),
-        });
-      }
-    }
-
-    if (typeof effect.spread === 'number') {
-      const spreadBound = boundVars.spread as { id?: string } | undefined;
-      if (!spreadBound?.id) {
-        unboundUsages.push({
-          layer: getLayerDisplayName(node),
-          layerId: node.id,
-          property: `${friendlyType} Spread`,
-          value: fmt(effect.spread),
-        });
-      }
-    }
-
-    if (effect.color) {
-      const colorBound = boundVars.color as { id?: string } | undefined;
-      if (!colorBound?.id) {
-        unboundUsages.push({
-          layer: getLayerDisplayName(node),
-          layerId: node.id,
-          property: `${friendlyType} Color`,
-          value: rgbString(effect.color),
-        });
-      }
-    }
-  }
-}
+// getUnboundEffectUsages was extracted to ./effectDetector. Re-export so
+// existing callers (code.ts, tests) keep working without an import change.
+export { getUnboundEffectUsages } from './effectDetector';

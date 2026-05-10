@@ -4,6 +4,10 @@ import { VariableUsage } from './types';
 import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
 import { processedFontSizeNodeIds } from './dedup';
 import { logger } from './utils/logger';
+import { getLayerDisplayName } from './utils/displayName';
+
+// Re-exported so existing imports from './nodeScanner' keep working.
+export { getLayerDisplayName };
 
 // Figma Paint typings do not expose boundVariables — augment locally.
 type PaintWithBindings = Paint & { boundVariables?: { color?: { id: string } } };
@@ -78,98 +82,6 @@ function getStrokeUsages(node: SceneNode, usages: VariableUsage[]): void {
       usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.STROKE_COLOR, id: binding.id });
     }
   }
-}
-
-/**
- * Returns a human-readable display name for a node.
- * Detects Figma internal ID-like names (e.g. "I120:11083;62:3910;56:3286")
- * and falls back to the component name or a formatted type label.
- *
- * @param node - The scene node to get a display name for.
- * @returns Human-readable layer name.
- */
-const IS_FIGMA_ID = /^I?\d+:\d+(;\d+:\d+)*$/;
-// Matches "I120:11085;62:3213" — captures the embedded instance node ID "120:11085"
-const INSTANCE_SUBLAYER_ID = /^I(\d+:\d+)/;
-
-/**
- * Attempts to get the best human-readable name from an INSTANCE node
- * by resolving through its mainComponent and COMPONENT_SET hierarchy.
- */
-function resolveInstanceName(node: InstanceNode): string | null {
-  const comp = node.mainComponent;
-  if (!comp) return null;
-  if (comp.parent?.type === 'COMPONENT_SET' && !IS_FIGMA_ID.test(comp.parent.name)) {
-    return comp.parent.name;
-  }
-  if (!IS_FIGMA_ID.test(comp.name)) return comp.name;
-  return null;
-}
-
-export function getLayerDisplayName(node: SceneNode): string {
-  if (!IS_FIGMA_ID.test(node.name)) return node.name;
-
-  // INSTANCE: resolve through component hierarchy
-  if (node.type === 'INSTANCE') {
-    const name = resolveInstanceName(node as InstanceNode);
-    if (name) return name;
-  }
-
-  // COMPONENT: check for a named COMPONENT_SET parent
-  if (node.type === 'COMPONENT') {
-    const parent = node.parent;
-    if (parent?.type === 'COMPONENT_SET' && !IS_FIGMA_ID.test(parent.name)) {
-      return parent.name;
-    }
-  }
-
-  // Walk up the parent chain (max 10 levels) for the nearest real ancestor name
-  let ancestor: BaseNode | null = node.parent;
-  let depth = 0;
-  while (ancestor && depth < 10) {
-    if (
-      typeof (ancestor as { name?: string }).name === 'string' &&
-      !IS_FIGMA_ID.test((ancestor as { name: string }).name) &&
-      ancestor.type !== 'PAGE' &&
-      ancestor.type !== 'DOCUMENT'
-    ) {
-      return (ancestor as { name: string }).name;
-    }
-    ancestor = (ancestor as { parent?: BaseNode | null }).parent ?? null;
-    depth++;
-  }
-
-  // For I-prefixed sublayer names (e.g. "I120:11085;62:3213"), resolve the
-  // containing instance node by its embedded ID and use its display name.
-  const sublayerMatch = INSTANCE_SUBLAYER_ID.exec(node.name);
-  if (sublayerMatch) {
-    const container = figma.getNodeById(sublayerMatch[1]) as SceneNode | null;
-    if (container) {
-      if (!IS_FIGMA_ID.test(container.name)) return container.name;
-      if (container.type === 'INSTANCE') {
-        const name = resolveInstanceName(container as InstanceNode);
-        if (name) return name;
-      }
-      // Walk the container's parent chain
-      let a: BaseNode | null = container.parent;
-      let d = 0;
-      while (a && d < 5) {
-        if (
-          typeof (a as { name?: string }).name === 'string' &&
-          !IS_FIGMA_ID.test((a as { name: string }).name) &&
-          a.type !== 'PAGE' &&
-          a.type !== 'DOCUMENT'
-        ) {
-          return (a as { name: string }).name;
-        }
-        a = (a as { parent?: BaseNode | null }).parent ?? null;
-        d++;
-      }
-    }
-  }
-
-  // Final fallback: human-readable type label
-  return node.type.charAt(0).toUpperCase() + node.type.slice(1).toLowerCase().replace(/_/g, ' ');
 }
 
 /**

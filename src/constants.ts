@@ -20,6 +20,14 @@ export const PROPERTY_NAMES = {
   PADDING_TOP: 'Padding Top',
   PADDING_BOTTOM: 'Padding Bottom',
   ITEM_SPACING: 'Gap',
+  MIN_WIDTH: 'Min Width',
+  MAX_WIDTH: 'Max Width',
+  MIN_HEIGHT: 'Min Height',
+  MAX_HEIGHT: 'Max Height',
+  GRID_COLOR: 'Grid Color',
+  VISIBLE: 'Visible',
+  TEXT_DECORATION: 'Text Decoration',
+  TEXT_CASE: 'Text Case',
 } as const;
 
 /**
@@ -56,6 +64,11 @@ export const PROPERTY_MAPPING: Record<string, string> = {
   strokeRightWeight: 'Stroke Right Weight',
   width: 'Width',
   height: 'Height',
+  minWidth: 'Min Width',
+  maxWidth: 'Max Width',
+  minHeight: 'Min Height',
+  maxHeight: 'Max Height',
+  visible: 'Visible',
 } as const;
 
 /** Spacing property display names that must never be deduplicated. */

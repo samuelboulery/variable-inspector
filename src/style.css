@@ -556,3 +556,155 @@ li {
   padding: 2rem 1rem;
   font-size: 14px;
 }
+
+/* ==========================================================================
+   Figma UI3 toolbar — replaces the legacy .search-input / .rescan-btn /
+   .sort-toggle / .filter-row / .chip rules. The legacy rules are removed
+   in a follow-up commit once renderToolbar() emits the new markup.
+   ========================================================================== */
+
+.fg-search {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px 0 26px;
+  border: 1px solid transparent;
+  border-radius: var(--fg-radius);
+  background: var(--fg-bg-soft) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 8px center;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background-color 0.1s, border-color 0.1s;
+}
+.fg-search::placeholder { color: var(--fg-text-muted); }
+.fg-search:focus {
+  outline: none;
+  background-color: var(--fg-bg);
+  border-color: var(--fg-accent);
+}
+
+.fg-ghost {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-text);
+  transition: background 0.1s;
+}
+.fg-ghost:hover { background: var(--fg-bg-soft); }
+.fg-ghost svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.fg-rescan.scanning svg { animation: spin 1s linear infinite; }
+
+.fg-seg {
+  display: inline-flex;
+  background: var(--fg-bg-soft);
+  border-radius: var(--fg-radius);
+  padding: 2px;
+}
+.fg-seg button {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--fg-text);
+  font-family: inherit;
+  font-weight: 400;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.fg-seg button.active {
+  background: var(--fg-bg);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.fg-filter-btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background 0.1s;
+}
+.fg-filter-btn:hover { background: var(--fg-bg-soft); }
+.fg-filter-btn .fg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--fg-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+.fg-filter-btn .fg-caret {
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.fg-filter-btn[data-expanded="true"] .fg-caret { transform: rotate(180deg); }
+
+.fg-filters {
+  margin-top: 6px;
+  padding: 6px 0 2px 0;
+}
+.fg-frow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.fg-frow:last-child { margin-bottom: 0; }
+.fg-flabel {
+  font-size: 10px;
+  color: var(--fg-text-muted);
+  min-width: 44px;
+  font-weight: 500;
+}
+
+.fg-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: none;
+  border-radius: var(--fg-radius-pill);
+  background: var(--fg-bg-soft);
+  font-size: 10px;
+  color: var(--fg-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 400;
+  transition: background 0.1s, color 0.1s;
+}
+.fg-chip:hover { background: var(--fg-bg-hover); }
+.fg-chip.active {
+  background: var(--fg-accent);
+  color: #fff;
+}

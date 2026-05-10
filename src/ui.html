@@ -15,6 +15,17 @@
     </svg>
   </div>
   <script>
+    // Surfaçage des erreurs runtime — sinon le panneau Figma reste blanc
+    // sans aucun feedback. Affiche l'erreur dans le DOM directement.
+    window.addEventListener('error', (ev) => {
+      const app = document.getElementById('app');
+      if (!app) return;
+      const errBox = document.createElement('div');
+      errBox.style.cssText = 'padding:1rem;background:#fee;color:#900;font:12px monospace;white-space:pre-wrap;';
+      errBox.textContent = `JS error: ${ev.message}\nat ${ev.filename}:${ev.lineno}:${ev.colno}`;
+      app.appendChild(errBox);
+    });
+
     // Gestion du redimensionnement
     const resizeHandle = document.querySelector('.resize-handle');
     let isResizing = false;

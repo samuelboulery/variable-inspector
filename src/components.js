@@ -1,4 +1,4 @@
-import { createVariableTypeIcon, createPropertyIcon, createLayerTypeIcon } from './ui.js';
+import { createVariableTypeIcon, createPropertyIcon, createLayerTypeIcon, formatRGBA } from './ui.js';
 
 let openPathPill = null; // singleton open pill for auto-close
 
@@ -17,6 +17,14 @@ export function createVariablePill(item) {
   const pill = document.createElement('span');
   pill.className = `variable-pill ${item.origin}-variable`;
   pill.style.cursor = item.path ? 'pointer' : 'default';
+
+  // Inject color swatch before type icon for COLOR variables
+  if (item.type === 'COLOR' && item.colorValue) {
+    const swatch = document.createElement('span');
+    swatch.className = 'color-swatch';
+    swatch.style.backgroundColor = formatRGBA(item.colorValue);
+    pill.appendChild(swatch);
+  }
 
   const typeIcon = createVariableTypeIcon(item.type);
   if (typeIcon) {

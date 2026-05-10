@@ -86,6 +86,32 @@ body {
   min-height: 200px;
   background: var(--fg-bg);
   color: var(--fg-text);
+  scrollbar-color: var(--fg-border) transparent;
+  scrollbar-width: thin;
+}
+
+/* Custom scrollbar — Figma-native thin, hover-revealed, themed via tokens. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fg-border);
+  border-radius: 5px;
+  border: 2px solid var(--fg-bg);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-text-muted);
+  background-clip: padding-box;
+  border: 2px solid var(--fg-bg);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 h2 {

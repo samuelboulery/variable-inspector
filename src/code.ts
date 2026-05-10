@@ -9,6 +9,7 @@ import { loadVariables } from './variableLoader';
 import { inspectNode, collectAllNodes } from './nodeScanner';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
 import { groupByFingerprint } from './instanceFingerprint';
+import { collectMergedAwayDescendantIds } from './mergedInstanceExclusion';
 import { logger } from './utils/logger';
 import { computeStats } from './ui/utils';
 
@@ -66,13 +67,25 @@ async function buildLayerInfoMap(
     }
   };
 
+  // Insert merged representatives first so that the UI fallback by name
+  // (ui.html) finds the representative entry — which carries count and
+  // mergedNodeIds — before any descendant entry sharing the same display
+  // name. Without this, unbound-only merged layers never render the × N
+  // badge because the fallback picks a descendant whose count is undefined.
+  let mergedOrder = 0;
+  for (const layerId of mergedInfo.keys()) {
+    const node = (await figma.getNodeByIdAsync(layerId)) as SceneNode | null;
+    if (node) {
+      await tryAdd(layerId, node.name, mergedOrder++);
+    }
+  }
   for (let idx = 0; idx < allUsages.length; idx++) {
     const u = allUsages[idx];
-    await tryAdd(u.layerId, u.layer, idx);
+    await tryAdd(u.layerId, u.layer, mergedOrder + idx);
   }
   for (let idx = 0; idx < unboundUsages.length; idx++) {
     const u = unboundUsages[idx];
-    await tryAdd(u.layerId, u.layer, allUsages.length + idx);
+    await tryAdd(u.layerId, u.layer, mergedOrder + allUsages.length + idx);
   }
 
   return layerInfoMap;
@@ -145,12 +158,14 @@ async function runInspector(): Promise<void> {
   const allNodes = collectAllNodes(selection);
 
   const groups = groupByFingerprint(allNodes);
+  const excluded = collectMergedAwayDescendantIds(groups);
   const allUsages: FullUsageEntry[] = [];
   const unboundUsages: UnboundUsage[] = [];
   const mergedInfo = new Map<string, { count: number; nodeIds: string[] }>();
 
   for (const [, bucket] of groups) {
     const representative = bucket[0];
+    if (excluded.has(representative.id)) continue;
     const isMerged = bucket.length > 1 && representative.type === 'INSTANCE';
 
     if (isMerged) {

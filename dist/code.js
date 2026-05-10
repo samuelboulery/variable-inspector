@@ -1,4 +1,4 @@
-const z=`<!DOCTYPE html>
+const q=`<!DOCTYPE html>
 <html>
 
 <head>
@@ -348,6 +348,107 @@ const z=`<!DOCTYPE html>
     }
 
     // Fonction pour rendre une liste d'éléments (groupés ou simples)
+    /**
+     * Splits an array of items (bound or unbound) into two arrays:
+     * those without an effectGroup (rendered normally) and those with one
+     * (rendered grouped). Mutates nothing; returns { normal, effectItems }.
+     */
+    function splitEffectsFromItems(items) {
+      const normal = [];
+      const effectItems = [];
+      for (const item of items || []) {
+        if (item && item.effectGroup) effectItems.push(item);
+        else normal.push(item);
+      }
+      return { normal, effectItems };
+    }
+
+    /**
+     * Builds a Map<effectGroup, { bound: [], unbound: [] }> grouping each
+     * effect's sub-props together. Insertion order = first appearance.
+     */
+    function groupEffectItems(boundEffects, unboundEffects) {
+      const groups = new Map();
+      const bucket = (key) => {
+        if (!groups.has(key)) groups.set(key, { bound: [], unbound: [] });
+        return groups.get(key);
+      };
+      for (const e of boundEffects) bucket(e.effectGroup).bound.push(e);
+      for (const u of unboundEffects) bucket(u.effectGroup).unbound.push(u);
+      return groups;
+    }
+
+    /**
+     * Sort sub-props in a logical order: Radius/Blur first, then Offset X/Y,
+     * then Spread, then Color. Anything else falls to the bottom alphabetically.
+     */
+    const SUBPROP_ORDER = ['Blur', 'Radius', 'Offset X', 'Offset Y', 'Spread', 'Color'];
+    function sortSubProps(items) {
+      return [...items].sort((a, b) => {
+        const ai = SUBPROP_ORDER.indexOf(a.subProp);
+        const bi = SUBPROP_ORDER.indexOf(b.subProp);
+        const ax = ai === -1 ? SUBPROP_ORDER.length : ai;
+        const bx = bi === -1 ? SUBPROP_ORDER.length : bi;
+        if (ax !== bx) return ax - bx;
+        return (a.subProp || '').localeCompare(b.subProp || '');
+      });
+    }
+
+    /**
+     * Renders one effect group block (e.g. "Drop Shadow 1") with its
+     * sub-props mixed (bound pills and unbound danger rows).
+     */
+    function renderEffectGroup(name, bound, unbound) {
+      const group = document.createElement('div');
+      group.className = 'effect-group';
+
+      const header = document.createElement('h4');
+      header.textContent = name;
+      group.appendChild(header);
+
+      const list = document.createElement('div');
+      list.className = 'effect-subprops';
+
+      const sortedBound = sortSubProps(bound);
+      const sortedUnbound = sortSubProps(unbound);
+
+      for (const b of sortedBound) {
+        list.appendChild(renderEffectSubPropRow(b.subProp || b.property, createVariablePill(b), false));
+      }
+      for (const u of sortedUnbound) {
+        list.appendChild(renderEffectSubPropRow(u.subProp || u.property, document.createTextNode(u.value), true));
+      }
+
+      group.appendChild(list);
+      return group;
+    }
+
+    function renderEffectSubPropRow(label, valueEl, danger) {
+      const row = document.createElement('div');
+      row.className = 'effect-subprop' + (danger ? ' danger' : '');
+      const labelEl = document.createElement('span');
+      labelEl.className = 'effect-subprop-label';
+      labelEl.textContent = label + ':';
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      return row;
+    }
+
+    /**
+     * Renders all effect groups for one layer (bound + unbound mixed).
+     * Returns null if there's nothing to render so the caller can skip.
+     */
+    function renderEffectGroupsSection(boundEffects, unboundEffects) {
+      if (boundEffects.length === 0 && unboundEffects.length === 0) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'effect-groups-wrap';
+      const groups = groupEffectItems(boundEffects, unboundEffects);
+      for (const [groupName, { bound, unbound }] of groups) {
+        wrap.appendChild(renderEffectGroup(groupName, bound, unbound));
+      }
+      return wrap;
+    }
+
     function renderItemsList(items, isUnbound = false) {
       const ul = document.createElement("ul");
 
@@ -451,9 +552,9 @@ const z=`<!DOCTYPE html>
       const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
       const unboundMap = {};
       if (unbound) {
-        unbound.forEach(({ layer, property, value }) => {
+        unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
           if (!unboundMap[layer]) unboundMap[layer] = [];
-          unboundMap[layer].push({ property, value });
+          unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }
       const container = document.getElementById("app");
@@ -596,10 +697,19 @@ const z=`<!DOCTYPE html>
 
 
 
-          // Ajouter les propriétés non variabilisées s'il y en a
-          if (unboundItems && unboundItems.length > 0) {
+          // Split effect-grouped items from regular items so each effect
+          // (Drop Shadow 1 / 2 ...) renders as one indented sub-section
+          // mixing bound + unbound sub-props.
+          const boundSplit = splitEffectsFromItems(items);
+          const unboundSplit = splitEffectsFromItems(unboundItems);
+          const normalItems = boundSplit.normal;
+          const normalUnboundItems = unboundSplit.normal;
+          const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
+
+          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          if (normalUnboundItems && normalUnboundItems.length > 0) {
             // Grouper aussi les propriétés non liées
-            const groupedUnboundItems = groupSimilarUnboundProperties(unboundItems);
+            const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
 
             const warn = document.createElement("div");
             warn.className = "danger";
@@ -613,14 +723,21 @@ const z=`<!DOCTYPE html>
             section.appendChild(warn);
           }
 
-          // Ajouter les variables liées s'il y en a
-          if (items && items.length > 0) {
+          // Ajouter les variables liées s'il y en a (hors effets)
+          if (normalItems && normalItems.length > 0) {
             // Grouper les propriétés similaires
-            const groupedItems = groupSimilarProperties(items);
+            const groupedItems = groupSimilarProperties(normalItems);
 
             // Utiliser la fonction renderItemsList pour les éléments liés
             const ul = renderItemsList(groupedItems, false);
             section.appendChild(ul);
+          }
+
+          // Effect groups: each Drop Shadow N (or Inner Shadow / Layer Blur)
+          // renders as its own indented sub-section combining bound pills and
+          // unbound danger rows for its sub-props.
+          if (effectGroupsBlock) {
+            section.appendChild(effectGroupsBlock);
           }
 
 
@@ -632,7 +749,7 @@ const z=`<!DOCTYPE html>
   <\/script>
 </body>
 
-</html>`,U=`body {
+</html>`,Y=`body {
   font-family: Inter, sans-serif;
   margin: 0;
   padding: 1rem;
@@ -913,6 +1030,49 @@ li {
   background-position: center;
 }
 
+.effect-groups-wrap {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.effect-group {
+  padding-left: 8px;
+  border-left: 2px solid #d0d8e0;
+}
+
+.effect-group h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.effect-subprops {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.effect-subprop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.effect-subprop-label {
+  color: #666;
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.effect-subprop.danger {
+  color: #8F0000;
+}
+
 .alert-icon {
   display: inline-flex;
   width: 16px;
@@ -1172,4 +1332,4 @@ li {
   color: #999;
   padding: 2rem 1rem;
   font-size: 14px;
-}`,c={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},I={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},B=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"];function j(){try{return!0}catch(e){return!1}}const S=j(),h={log:(...e)=>{S||console.log(...e)},warn:(...e)=>{S||console.warn(...e)},error:(...e)=>{S||console.error(...e)}},N=new Set,V=new Set;function q(e,n,t){return`${e}|${n}`}function Y(){N.clear(),V.clear()}function v(e,n,t){const r=q(e,n);return h.log(`Checking property: ${r}, propertyName: ${n}, exists: ${V.has(r)}`),B.some(o=>n.includes(o))?(h.log(`Skipping deduplication for spacing property: ${n}`),V.add(r),!1):V.has(r)?!0:(V.add(r),!1)}const x=/^I?\d+:\d+(;\d+:\d+)*$/,X=/^I(\d+:\d+)/;function W(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!x.test(n.parent.name)?n.parent.name:x.test(n.name)?null:n.name:null}function G(e,n){var i;let t=e,r=0;for(;t&&r<n;){const o=t.name;if(typeof o=="string"&&!x.test(o)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return o;t=(i=t.parent)!=null?i:null,r++}return null}function K(e){const n=X.exec(e);if(!n)return null;const t=figma.getNodeById(n[1]);if(!t)return null;if(!x.test(t.name))return t.name;if(t.type==="INSTANCE"){const r=W(t);if(r)return r}return G(t.parent,5)}function u(e){if(!x.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=W(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!x.test(r.name))return r.name}const n=G(e.parent,10);if(n)return n;const t=K(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const J=[{key:"minWidth",name:c.MIN_WIDTH},{key:"maxWidth",name:c.MAX_WIDTH},{key:"minHeight",name:c.MIN_HEIGHT},{key:"maxHeight",name:c.MAX_HEIGHT}];function Q(e,n){var r;const t=e.boundVariables;if(t)for(const{key:i,name:o}of J){const C=(r=t[i])==null?void 0:r.id;C&&n.push({layer:u(e),property:o,id:C})}}function e1(e,n){var r,i;const t=e.layoutGrids;if(Array.isArray(t))for(const o of t){const C=(i=(r=o.boundVariables)==null?void 0:r.color)==null?void 0:i.id;C&&n.push({layer:u(e),property:c.GRID_COLOR,id:C})}}function n1(e,n){var r,i;const t=(i=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:i.id;t&&n.push({layer:u(e),property:c.VISIBLE,id:t})}function t1(e,n){var o,C;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(o=t.textDecoration)==null?void 0:o.id,i=(C=t.textCase)==null?void 0:C.id;r&&n.push({layer:u(e),property:c.TEXT_DECORATION,id:r}),i&&n.push({layer:u(e),property:c.TEXT_CASE,id:i})}function r1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[i,o]of Object.entries(t))o!=null&&o.id&&n.push({layer:u(e),property:`Component / ${i}`,id:o.id})}function o1(e,n){var C;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const i=new Set,o=new Set;for(const a of t){const l=(C=a.boundVariables)==null?void 0:C.color;l!=null&&l.id&&!i.has(l.id)&&(o.add(l.id),i.add(l.id))}if(o.size>0){const a=Array.from(o)[0];n.push({layer:u(e),property:c.FILL,id:a}),o.size>1&&h.log(`${e.name} has ${o.size} fill variables, only the first is shown`)}}function i1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const o=(t=r.boundVariables)==null?void 0:t.color;o!=null&&o.id&&n.push({layer:u(e),property:c.STROKE_COLOR,id:o.id})}}function _(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function C1(e,n){var o,C;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const a of t)r[a.type]=((o=r[a.type])!=null?o:0)+1;const i={};for(const a of t){if(!a.boundVariables)continue;const s=r[a.type];i[a.type]=((C=i[a.type])!=null?C:0)+1;const l=i[a.type],d=_(a.type),p=s>1?`${d} ${l}`:d;for(const[b,f]of Object.entries(a.boundVariables))f.id&&n.push({layer:u(e),property:`${p} ${b}`,id:f.id})}}function a1(e,n){var C,a;const r=e.boundVariables;if(!r)return;const i=new Set(["color","fills","fills.0"]);for(const[s,l]of Object.entries(r)){if(i.has(s)||s.startsWith("fills."))continue;const d=l;if(d.id){const p=(C=I[s])!=null?C:s;n.push({layer:u(e),property:p,id:d.id})}}const o=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const s of o){const l=e,d=r[s];if(l[s]!==void 0&&(d!=null&&d.id)){const p=(a=I[s])!=null?a:s;n.push({layer:u(e),property:p,id:d.id})}}}function s1(e,n){var o;const t=e.boundVariables;if(!t)return;const r={fontSize:c.FONT_SIZE,fontWeight:c.FONT_WEIGHT,fontFamily:c.FONT_FAMILY,letterSpacing:c.LETTER_SPACING,lineHeight:c.LINE_HEIGHT,paragraphSpacing:c.PARAGRAPH_SPACING};for(const[C,a]of Object.entries(r)){const s=t[C];s!=null&&s.id&&(n.push({layer:u(e),property:a,id:s.id}),C==="fontSize"&&N.add(e.id))}const i={};F(t,i);for(const[C,a]of Object.entries(i)){let s=C;for(const[l,d]of Object.entries(r))if(C.includes(l)){s=d,l==="fontSize"&&N.add(e.id);break}s===C&&(s=(o=I[C])!=null?o:C);for(const l of a)n.push({layer:u(e),property:s,id:l})}}function F(e,n,t=[]){if(!(!e||typeof e!="object")){if(typeof e.id=="string"){const r=t.join(".");!r.startsWith("fills.")&&r!=="fills"&&(n[r]||(n[r]=[]),n[r].push(e.id));return}for(const r of Object.keys(e))r==="fills"||t.length>0&&t[0]==="fills"||F(e[r],n,[...t,r])}}function $(e){const n=[];return o1(e,n),i1(e,n),C1(e,n),Q(e,n),e1(e,n),n1(e,n),e.type==="TEXT"&&(s1(e,n),t1(e,n)),e.type==="INSTANCE"&&r1(e,n),a1(e,n),n}function D(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children)}return n}const E=new Map,l1=10;async function k(e,n){var l,d;const t=[];let r=e;for(let p=0;p<l1;p++){t.push(r.name);const b=Object.keys((l=r.valuesByMode)!=null?l:{});if(b.length===0)break;const f=r.valuesByMode[b[0]];if(typeof f=="object"&&f!==null&&f.type==="VARIABLE_ALIAS"){const g=f.id,y=await figma.variables.getVariableByIdAsync(g);if(!y||y.id===r.id)break;r=y;continue}break}const i=t.length>1,o=await p1(r.variableCollectionId),C=r.name.split("/").filter(p=>p.length>0),a=(d=C.pop())!=null?d:r.name,s={collection:o,groups:C,name:a,isAlias:i};return n&&(s.library=c1(r)),i&&(s.aliasChain=t),s}async function p1(e){if(E.has(e))return E.get(e);const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)if(E.set(t.id,t.name),t.id===e)return t.name;return"Unknown collection"}function c1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function P(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=e.valuesByMode[n[0]];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function d1(){const e=new Map;return await u1(e),await f1(e),h.log("loadVariables: found",e.size,"variables"),e}async function u1(e){const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)for(const r of t.variableIds){const i=await figma.variables.getVariableByIdAsync(r);if(!i)continue;const o=await k(i,!1);e.set(r,{name:i.name,type:i.resolvedType,origin:"local",colorValue:P(i),path:o})}}async function f1(e){const n=figma.currentPage.selection,t=D(n),r=new Set;for(const i of t){const o=$(i);for(const{id:C}of o)e.has(C)||r.add(C)}for(const i of r)try{const o=await figma.variables.getVariableByIdAsync(i);if(!o)continue;const C=await k(o,!0);if(e.set(i,{name:o.name,type:o.resolvedType,origin:"external",colorValue:P(o),path:C}),typeof figma.variables.importVariableByKeyAsync=="function"){const a=await figma.variables.importVariableByKeyAsync(o.key);if(a){const s=await k(a,!0);e.set(i,{name:a.name,type:a.resolvedType,origin:"external",colorValue:P(a),path:s})}}}catch(o){h.warn(`Failed to resolve variable ${i}:`,o)}}function Z(e){return Number(e.toFixed(2)).toString()}function g1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function m1(e,n){var o,C,a,s,l,d;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const p of t)r[p.type]=((o=r[p.type])!=null?o:0)+1;const i={};for(const p of t){const b=r[p.type];i[p.type]=((C=i[p.type])!=null?C:0)+1;const f=i[p.type],g=_(p.type),y=b>1?`${g} ${f}`:g,T=p.type.includes("BLUR")||p.type.includes("SHADOW"),L=(a=p.boundVariables)!=null?a:{};if(typeof p.radius=="number"){const m=L.radius;if(!(m!=null&&m.id)){const H=T?"Blur":"Radius";n.push({layer:u(e),layerId:e.id,property:`${y} ${H}`,value:Z(p.radius)})}}if(p.type.includes("SHADOW")&&p.offset){const m=(s=L.offset)!=null?s:{};typeof p.offset.x=="number"&&!((l=m.x)!=null&&l.id)&&n.push({layer:u(e),layerId:e.id,property:`${y} Offset X`,value:Z(p.offset.x)}),typeof p.offset.y=="number"&&!((d=m.y)!=null&&d.id)&&n.push({layer:u(e),layerId:e.id,property:`${y} Offset Y`,value:Z(p.offset.y)})}if(typeof p.spread=="number"){const m=L.spread;m!=null&&m.id||n.push({layer:u(e),layerId:e.id,property:`${y} Spread`,value:Z(p.spread)})}if(p.color){const m=L.color;m!=null&&m.id||n.push({layer:u(e),layerId:e.id,property:`${y} Color`,value:g1(p.color)})}}}function M(e){return Number(e.toFixed(2)).toString()}function R(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function h1(e,n){var t,r,i,o;if("fills"in e&&Array.isArray(e.fills))for(const C of e.fills){const a=C;!((r=(t=a.boundVariables)==null?void 0:t.color)!=null&&r.id)&&a.color&&n.push({layer:u(e),layerId:e.id,property:c.FILL,value:R(a.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let C;for(const a of e.strokes){const s=a;if(!((o=(i=s.boundVariables)==null?void 0:i.color)!=null&&o.id)&&s.color){C=s.color;break}}C&&!v(e.id,c.STROKE)&&(n.push({layer:u(e),layerId:e.id,property:c.STROKE,value:R(C)}),e.strokes.length>1&&h.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function y1(e,n){var r,i;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(i=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&i.id||v(e.id,c.OPACITY)||n.push({layer:u(e),layerId:e.id,property:c.OPACITY,value:M(t)})}function b1(e,n){var C,a,s,l,d,p,b;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((a=(C=t.strokes)==null?void 0:C.length)!=null?a:0)>0))return;const i=e.strokeWeight,o="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof i=="number"&&i!==0&&!((l=(s=e.boundVariables)==null?void 0:s.strokeWeight)!=null&&l.id)&&!o&&(v(e.id,c.STROKE_WEIGHT)||n.push({layer:u(e),layerId:e.id,property:c.STROKE_WEIGHT,value:M(i)}));for(const f of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(f in e))continue;const g=e[f];if(typeof g!="number"||g===0||(p=(d=e.boundVariables)==null?void 0:d[f])!=null&&p.id)continue;const y=(b=I[f])!=null?b:f;v(e.id,y)||n.push({layer:u(e),layerId:e.id,property:y,value:M(g)})}}function L1(e,n){var t,r,i,o,C;if("cornerRadius"in e){const a=e.cornerRadius,s="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof a=="number"&&a!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!s&&(v(e.id,c.CORNER_RADIUS)||n.push({layer:u(e),layerId:e.id,property:c.CORNER_RADIUS,value:M(a)}))}for(const a of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(a in e))continue;const s=e[a];if(typeof s!="number"||s===0||(o=(i=e.boundVariables)==null?void 0:i[a])!=null&&o.id)continue;const l=(C=I[a])!=null?C:a;v(e.id,l)||n.push({layer:u(e),layerId:e.id,property:l,value:M(s)})}}function v1(e,n){var i,o;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:c.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:c.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:c.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:c.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:C,displayName:a,skipIfProcessed:s}of r){if(s&&C==="fontSize"&&N.has(t.id))continue;const l=t[C];typeof l!="number"||l===0||(o=(i=e.boundVariables)==null?void 0:i[C])!=null&&o.id||v(e.id,a)||n.push({layer:u(e),layerId:e.id,property:a,value:M(l)})}}function M1(e,n){var r,i;const t=[{key:"paddingLeft",displayName:c.PADDING_LEFT},{key:"paddingRight",displayName:c.PADDING_RIGHT},{key:"paddingTop",displayName:c.PADDING_TOP},{key:"paddingBottom",displayName:c.PADDING_BOTTOM},{key:"itemSpacing",displayName:c.ITEM_SPACING}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const a=e[o];typeof a!="number"||a===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||(h.log(`Found spacing property ${o} = ${a} on node ${e.name}`),v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:M(a)}))}}function H1(e,n){var r,i;const t=[{key:"minWidth",displayName:c.MIN_WIDTH},{key:"maxWidth",displayName:c.MAX_WIDTH},{key:"minHeight",displayName:c.MIN_HEIGHT},{key:"maxHeight",displayName:c.MAX_HEIGHT}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const a=e[o];typeof a!="number"||a===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:M(a)})}}function w1(e,n){const t=e;y1(t,n),b1(t,n),L1(t,n),v1(t,n),M1(t,n),H1(t,n)}function x1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const i=e;if(!i.mainComponent)return null;const o=i.mainComponent.id,C=((n=i.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?i.mainComponent.parent.id:"",a=JSON.stringify(O((t=i.componentProperties)!=null?t:{})),s=JSON.stringify(O((r=i.boundVariables)!=null?r:{}));return[o,C,a,s].join("|")}catch(i){return null}}function V1(e){var t,r;const n=new Map;for(const i of e){const o=(t=x1(i))!=null?t:`__node__${i.id}`,C=(r=n.get(o))!=null?r:[];C.push(i),n.set(o,C)}return n}function O(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function I1(e,n,t){const r=Object.values(e).flat(),i=r.length,o=n.length,C=i+o,a=C===0?0:i/C,s={local:0,external:0},l={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)s[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(l[d.type]+=1);return{totalVariables:i,totalHardcoded:o,variableCoverage:a,byOrigin:s,byType:l,layerCount:Object.keys(e).length,scanDurationMs:t}}function Z1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function N1(e,n,t){const r=new Map,i=async(o,C,a)=>{if(r.has(o))return;const s=await figma.getNodeByIdAsync(o);if(s){const l=t.get(o),d={id:o,name:C,order:a,type:Z1(s)};l&&(d.count=l.count,d.mergedNodeIds=l.nodeIds),r.set(o,d)}};for(let o=0;o<e.length;o++){const C=e[o];await i(C.layerId,C.layer,o)}for(let o=0;o<n.length;o++){const C=n[o];await i(C.layerId,C.layer,e.length+o)}return r}function T1(e){var i;const n={};h.log(`Grouping ${e.length} usages by layer`);const t=new Map,r=[...e].sort((o,C)=>{const a=o.layer.localeCompare(C.layer);return a!==0?a:o.property.localeCompare(C.property)});for(const o of r){n[o.layerId]||(n[o.layerId]=[],t.set(o.layerId,new Set));const C=t.get(o.layerId),a=`${o.property}_${(i=o.id)!=null?i:""}`,s=B.some(l=>o.property.includes(l));h.log(`Layer: ${o.layer}, Property: ${o.property}, isSpacing: ${s}, isDuplicate: ${C.has(a)}`),(!C.has(a)||s)&&(n[o.layerId].push(o),C.add(a))}for(const[o,C]of Object.entries(n))h.log(`Layer ${o}: ${C.length} usages after grouping`);return n}async function A(){try{await S1()}catch(e){h.error("updateInspector error",e);const n={type:"error",message:String(e)};figma.ui.postMessage(n)}}async function S1(){Y();const e=Date.now();figma.ui.postMessage({type:"scan-start"});const n=await d1(),t=figma.currentPage.selection,r=D(t),i=V1(r),o=[],C=[],a=new Map;for(const[,f]of i){const g=f[0];f.length>1&&g.type==="INSTANCE"&&a.set(g.id,{count:f.length,nodeIds:f.map(L=>L.id)});const T=$(g);for(const{layer:L,property:m,id:H}of T){const w=n.get(H);o.push(w?{layer:L,layerId:g.id,property:m,name:w.name,type:w.type,origin:w.origin,colorValue:w.colorValue,id:H,path:w.path}:{layer:L,layerId:g.id,property:m,name:H,type:"STRING",origin:"external",id:H})}h1(g,C),w1(g,C),m1(g,C)}const s=await N1(o,C,a),l=T1(o);h.log("Final usages count:",o.length),h.log("Layers with variables:",Object.keys(l).length),h.log("Unbound usages count:",C.length),h.log("Total nodes in layerInfoMap:",s.size);const d=Date.now()-e,p=I1(l,C,d),b={type:"render",byLayer:l,unbound:C,layerInfoMap:Object.fromEntries(s),noVariablesFound:o.length===0&&C.length===0,stats:p,scanDurationMs:d};figma.ui.postMessage(b)}function E1(){figma.showUI(z.replace("</head>",`<style>${U}</style></head>`),{width:300,height:400,title:"Variable Inspector"}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"&&A()};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{A()},300)}),A()}E1();
+}`,c={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},Z={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},_=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"];function X(){try{return!0}catch(e){return!1}}const T=X(),y={log:(...e)=>{T||console.log(...e)},warn:(...e)=>{T||console.warn(...e)},error:(...e)=>{T||console.error(...e)}},S=new Set,V=new Set;function K(e,n,t){return`${e}|${n}`}function J(){S.clear(),V.clear()}function v(e,n,t){const r=K(e,n);return y.log(`Checking property: ${r}, propertyName: ${n}, exists: ${V.has(r)}`),_.some(o=>n.includes(o))?(y.log(`Skipping deduplication for spacing property: ${n}`),V.add(r),!1):V.has(r)?!0:(V.add(r),!1)}const I=/^I?\d+:\d+(;\d+:\d+)*$/,Q=/^I(\d+:\d+)/;function F(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!I.test(n.parent.name)?n.parent.name:I.test(n.name)?null:n.name:null}function D(e,n){var i;let t=e,r=0;for(;t&&r<n;){const o=t.name;if(typeof o=="string"&&!I.test(o)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return o;t=(i=t.parent)!=null?i:null,r++}return null}function e1(e){const n=Q.exec(e);if(!n)return null;const t=figma.getNodeById(n[1]);if(!t)return null;if(!I.test(t.name))return t.name;if(t.type==="INSTANCE"){const r=F(t);if(r)return r}return D(t.parent,5)}function u(e){if(!I.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=F(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!I.test(r.name))return r.name}const n=D(e.parent,10);if(n)return n;const t=e1(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const n1=[{key:"minWidth",name:c.MIN_WIDTH},{key:"maxWidth",name:c.MAX_WIDTH},{key:"minHeight",name:c.MIN_HEIGHT},{key:"maxHeight",name:c.MAX_HEIGHT}];function t1(e,n){var r;const t=e.boundVariables;if(t)for(const{key:i,name:o}of n1){const C=(r=t[i])==null?void 0:r.id;C&&n.push({layer:u(e),property:o,id:C})}}function r1(e,n){var r,i;const t=e.layoutGrids;if(Array.isArray(t))for(const o of t){const C=(i=(r=o.boundVariables)==null?void 0:r.color)==null?void 0:i.id;C&&n.push({layer:u(e),property:c.GRID_COLOR,id:C})}}function o1(e,n){var r,i;const t=(i=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:i.id;t&&n.push({layer:u(e),property:c.VISIBLE,id:t})}function i1(e,n){var o,C;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(o=t.textDecoration)==null?void 0:o.id,i=(C=t.textCase)==null?void 0:C.id;r&&n.push({layer:u(e),property:c.TEXT_DECORATION,id:r}),i&&n.push({layer:u(e),property:c.TEXT_CASE,id:i})}function C1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[i,o]of Object.entries(t))o!=null&&o.id&&n.push({layer:u(e),property:`Component / ${i}`,id:o.id})}function s1(e,n){var C;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const i=new Set,o=new Set;for(const s of t){const l=(C=s.boundVariables)==null?void 0:C.color;l!=null&&l.id&&!i.has(l.id)&&(o.add(l.id),i.add(l.id))}if(o.size>0){const s=Array.from(o)[0];n.push({layer:u(e),property:c.FILL,id:s}),o.size>1&&y.log(`${e.name} has ${o.size} fill variables, only the first is shown`)}}function a1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const o=(t=r.boundVariables)==null?void 0:t.color;o!=null&&o.id&&n.push({layer:u(e),property:c.STROKE_COLOR,id:o.id})}}function $(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function l1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function p1(e,n){var o,C;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const s of t)r[s.type]=((o=r[s.type])!=null?o:0)+1;const i={};for(const s of t){if(!s.boundVariables)continue;const a=r[s.type];i[s.type]=((C=i[s.type])!=null?C:0)+1;const l=i[s.type],d=$(s.type),p=a>1?`${d} ${l}`:d;for(const[b,f]of Object.entries(s.boundVariables))if(f.id){const g=l1(b,s.type);n.push({layer:u(e),property:`${p} ${b}`,id:f.id,effectGroup:p,subProp:g})}}}function c1(e,n){var C,s;const r=e.boundVariables;if(!r)return;const i=new Set(["color","fills","fills.0"]);for(const[a,l]of Object.entries(r)){if(i.has(a)||a.startsWith("fills."))continue;const d=l;if(d.id){const p=(C=Z[a])!=null?C:a;n.push({layer:u(e),property:p,id:d.id})}}const o=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const a of o){const l=e,d=r[a];if(l[a]!==void 0&&(d!=null&&d.id)){const p=(s=Z[a])!=null?s:a;n.push({layer:u(e),property:p,id:d.id})}}}function d1(e,n){var o;const t=e.boundVariables;if(!t)return;const r={fontSize:c.FONT_SIZE,fontWeight:c.FONT_WEIGHT,fontFamily:c.FONT_FAMILY,letterSpacing:c.LETTER_SPACING,lineHeight:c.LINE_HEIGHT,paragraphSpacing:c.PARAGRAPH_SPACING};for(const[C,s]of Object.entries(r)){const a=t[C];a!=null&&a.id&&(n.push({layer:u(e),property:s,id:a.id}),C==="fontSize"&&S.add(e.id))}const i={};z(t,i);for(const[C,s]of Object.entries(i)){let a=C;for(const[l,d]of Object.entries(r))if(C.includes(l)){a=d,l==="fontSize"&&S.add(e.id);break}a===C&&(a=(o=Z[C])!=null?o:C);for(const l of s)n.push({layer:u(e),property:a,id:l})}}function z(e,n,t=[]){if(!(!e||typeof e!="object")){if(typeof e.id=="string"){const r=t.join(".");!r.startsWith("fills.")&&r!=="fills"&&(n[r]||(n[r]=[]),n[r].push(e.id));return}for(const r of Object.keys(e))r==="fills"||t.length>0&&t[0]==="fills"||z(e[r],n,[...t,r])}}function U(e){const n=[];return s1(e,n),a1(e,n),p1(e,n),t1(e,n),r1(e,n),o1(e,n),e.type==="TEXT"&&(d1(e,n),i1(e,n)),e.type==="INSTANCE"&&C1(e,n),c1(e,n),n}function j(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children)}return n}const P=new Map,u1=10;async function R(e,n){var l,d;const t=[];let r=e;for(let p=0;p<u1;p++){t.push(r.name);const b=Object.keys((l=r.valuesByMode)!=null?l:{});if(b.length===0)break;const f=r.valuesByMode[b[0]];if(typeof f=="object"&&f!==null&&f.type==="VARIABLE_ALIAS"){const g=f.id,m=await figma.variables.getVariableByIdAsync(g);if(!m||m.id===r.id)break;r=m;continue}break}const i=t.length>1,o=await f1(r.variableCollectionId),C=r.name.split("/").filter(p=>p.length>0),s=(d=C.pop())!=null?d:r.name,a={collection:o,groups:C,name:s,isAlias:i};return n&&(a.library=g1(r)),i&&(a.aliasChain=t),a}async function f1(e){if(P.has(e))return P.get(e);const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)if(P.set(t.id,t.name),t.id===e)return t.name;return"Unknown collection"}function g1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function A(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=e.valuesByMode[n[0]];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function m1(){const e=new Map;return await h1(e),await y1(e),y.log("loadVariables: found",e.size,"variables"),e}async function h1(e){const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)for(const r of t.variableIds){const i=await figma.variables.getVariableByIdAsync(r);if(!i)continue;const o=await R(i,!1);e.set(r,{name:i.name,type:i.resolvedType,origin:"local",colorValue:A(i),path:o})}}async function y1(e){const n=figma.currentPage.selection,t=j(n),r=new Set;for(const i of t){const o=U(i);for(const{id:C}of o)e.has(C)||r.add(C)}for(const i of r)try{const o=await figma.variables.getVariableByIdAsync(i);if(!o)continue;const C=await R(o,!0);if(e.set(i,{name:o.name,type:o.resolvedType,origin:"external",colorValue:A(o),path:C}),typeof figma.variables.importVariableByKeyAsync=="function"){const s=await figma.variables.importVariableByKeyAsync(o.key);if(s){const a=await R(s,!0);e.set(i,{name:s.name,type:s.resolvedType,origin:"external",colorValue:A(s),path:a})}}}catch(o){y.warn(`Failed to resolve variable ${i}:`,o)}}function N(e){return Number(e.toFixed(2)).toString()}function b1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function v1(e,n){var o,C,s,a,l,d;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const p of t)r[p.type]=((o=r[p.type])!=null?o:0)+1;const i={};for(const p of t){const b=r[p.type];i[p.type]=((C=i[p.type])!=null?C:0)+1;const f=i[p.type],g=$(p.type),m=b>1?`${g} ${f}`:g,E=p.type.includes("BLUR")||p.type.includes("SHADOW"),L=(s=p.boundVariables)!=null?s:{},M=u(e);if(typeof p.radius=="number"){const h=L.radius;if(!(h!=null&&h.id)){const x=E?"Blur":"Radius";n.push({layer:M,layerId:e.id,property:`${m} ${x}`,value:N(p.radius),effectGroup:m,subProp:x})}}if(p.type.includes("SHADOW")&&p.offset){const h=(a=L.offset)!=null?a:{};typeof p.offset.x=="number"&&!((l=h.x)!=null&&l.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset X`,value:N(p.offset.x),effectGroup:m,subProp:"Offset X"}),typeof p.offset.y=="number"&&!((d=h.y)!=null&&d.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset Y`,value:N(p.offset.y),effectGroup:m,subProp:"Offset Y"})}if(typeof p.spread=="number"){const h=L.spread;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Spread`,value:N(p.spread),effectGroup:m,subProp:"Spread"})}if(p.color){const h=L.color;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Color`,value:b1(p.color),effectGroup:m,subProp:"Color"})}}}function w(e){return Number(e.toFixed(2)).toString()}function G(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function L1(e,n){var t,r,i,o;if("fills"in e&&Array.isArray(e.fills))for(const C of e.fills){const s=C;!((r=(t=s.boundVariables)==null?void 0:t.color)!=null&&r.id)&&s.color&&n.push({layer:u(e),layerId:e.id,property:c.FILL,value:G(s.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let C;for(const s of e.strokes){const a=s;if(!((o=(i=a.boundVariables)==null?void 0:i.color)!=null&&o.id)&&a.color){C=a.color;break}}C&&!v(e.id,c.STROKE)&&(n.push({layer:u(e),layerId:e.id,property:c.STROKE,value:G(C)}),e.strokes.length>1&&y.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function M1(e,n){var r,i;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(i=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&i.id||v(e.id,c.OPACITY)||n.push({layer:u(e),layerId:e.id,property:c.OPACITY,value:w(t)})}function w1(e,n){var C,s,a,l,d,p,b;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((s=(C=t.strokes)==null?void 0:C.length)!=null?s:0)>0))return;const i=e.strokeWeight,o="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof i=="number"&&i!==0&&!((l=(a=e.boundVariables)==null?void 0:a.strokeWeight)!=null&&l.id)&&!o&&(v(e.id,c.STROKE_WEIGHT)||n.push({layer:u(e),layerId:e.id,property:c.STROKE_WEIGHT,value:w(i)}));for(const f of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(f in e))continue;const g=e[f];if(typeof g!="number"||g===0||(p=(d=e.boundVariables)==null?void 0:d[f])!=null&&p.id)continue;const m=(b=Z[f])!=null?b:f;v(e.id,m)||n.push({layer:u(e),layerId:e.id,property:m,value:w(g)})}}function x1(e,n){var t,r,i,o,C;if("cornerRadius"in e){const s=e.cornerRadius,a="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof s=="number"&&s!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!a&&(v(e.id,c.CORNER_RADIUS)||n.push({layer:u(e),layerId:e.id,property:c.CORNER_RADIUS,value:w(s)}))}for(const s of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(s in e))continue;const a=e[s];if(typeof a!="number"||a===0||(o=(i=e.boundVariables)==null?void 0:i[s])!=null&&o.id)continue;const l=(C=Z[s])!=null?C:s;v(e.id,l)||n.push({layer:u(e),layerId:e.id,property:l,value:w(a)})}}function H1(e,n){var i,o;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:c.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:c.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:c.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:c.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:C,displayName:s,skipIfProcessed:a}of r){if(a&&C==="fontSize"&&S.has(t.id))continue;const l=t[C];typeof l!="number"||l===0||(o=(i=e.boundVariables)==null?void 0:i[C])!=null&&o.id||v(e.id,s)||n.push({layer:u(e),layerId:e.id,property:s,value:w(l)})}}function I1(e,n){var r,i;const t=[{key:"paddingLeft",displayName:c.PADDING_LEFT},{key:"paddingRight",displayName:c.PADDING_RIGHT},{key:"paddingTop",displayName:c.PADDING_TOP},{key:"paddingBottom",displayName:c.PADDING_BOTTOM},{key:"itemSpacing",displayName:c.ITEM_SPACING}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||(y.log(`Found spacing property ${o} = ${s} on node ${e.name}`),v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)}))}}function V1(e,n){var r,i;const t=[{key:"minWidth",displayName:c.MIN_WIDTH},{key:"maxWidth",displayName:c.MAX_WIDTH},{key:"minHeight",displayName:c.MIN_HEIGHT},{key:"maxHeight",displayName:c.MAX_HEIGHT}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)})}}function Z1(e,n){const t=e;M1(t,n),w1(t,n),x1(t,n),H1(t,n),I1(t,n),V1(t,n)}function N1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const i=e;if(!i.mainComponent)return null;const o=i.mainComponent.id,C=((n=i.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?i.mainComponent.parent.id:"",s=JSON.stringify(W((t=i.componentProperties)!=null?t:{})),a=JSON.stringify(W((r=i.boundVariables)!=null?r:{}));return[o,C,s,a].join("|")}catch(i){return null}}function S1(e){var t,r;const n=new Map;for(const i of e){const o=(t=N1(i))!=null?t:`__node__${i.id}`,C=(r=n.get(o))!=null?r:[];C.push(i),n.set(o,C)}return n}function W(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function E1(e,n,t){const r=Object.values(e).flat(),i=r.length,o=n.length,C=i+o,s=C===0?0:i/C,a={local:0,external:0},l={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)a[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(l[d.type]+=1);return{totalVariables:i,totalHardcoded:o,variableCoverage:s,byOrigin:a,byType:l,layerCount:Object.keys(e).length,scanDurationMs:t}}function T1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function P1(e,n,t){const r=new Map,i=async(o,C,s)=>{if(r.has(o))return;const a=await figma.getNodeByIdAsync(o);if(a){const l=t.get(o),d={id:o,name:C,order:s,type:T1(a)};l&&(d.count=l.count,d.mergedNodeIds=l.nodeIds),r.set(o,d)}};for(let o=0;o<e.length;o++){const C=e[o];await i(C.layerId,C.layer,o)}for(let o=0;o<n.length;o++){const C=n[o];await i(C.layerId,C.layer,e.length+o)}return r}function k1(e){var i;const n={};y.log(`Grouping ${e.length} usages by layer`);const t=new Map,r=[...e].sort((o,C)=>{const s=o.layer.localeCompare(C.layer);return s!==0?s:o.property.localeCompare(C.property)});for(const o of r){n[o.layerId]||(n[o.layerId]=[],t.set(o.layerId,new Set));const C=t.get(o.layerId),s=`${o.property}_${(i=o.id)!=null?i:""}`,a=_.some(l=>o.property.includes(l));y.log(`Layer: ${o.layer}, Property: ${o.property}, isSpacing: ${a}, isDuplicate: ${C.has(s)}`),(!C.has(s)||a)&&(n[o.layerId].push(o),C.add(s))}for(const[o,C]of Object.entries(n))y.log(`Layer ${o}: ${C.length} usages after grouping`);return n}async function k(){try{await R1()}catch(e){y.error("updateInspector error",e);const n={type:"error",message:String(e)};figma.ui.postMessage(n)}}async function R1(){J();const e=Date.now();figma.ui.postMessage({type:"scan-start"});const n=await m1(),t=figma.currentPage.selection,r=j(t),i=S1(r),o=[],C=[],s=new Map;for(const[,f]of i){const g=f[0];f.length>1&&g.type==="INSTANCE"&&s.set(g.id,{count:f.length,nodeIds:f.map(L=>L.id)});const E=U(g);for(const L of E){const{layer:M,property:h,id:x,effectGroup:O,subProp:B}=L,H=n.get(x);o.push(H?{layer:M,layerId:g.id,property:h,name:H.name,type:H.type,origin:H.origin,colorValue:H.colorValue,id:x,path:H.path,effectGroup:O,subProp:B}:{layer:M,layerId:g.id,property:h,name:x,type:"STRING",origin:"external",id:x,effectGroup:O,subProp:B})}L1(g,C),Z1(g,C),v1(g,C)}const a=await P1(o,C,s),l=k1(o);y.log("Final usages count:",o.length),y.log("Layers with variables:",Object.keys(l).length),y.log("Unbound usages count:",C.length),y.log("Total nodes in layerInfoMap:",a.size);const d=Date.now()-e,p=E1(l,C,d),b={type:"render",byLayer:l,unbound:C,layerInfoMap:Object.fromEntries(a),noVariablesFound:o.length===0&&C.length===0,stats:p,scanDurationMs:d};figma.ui.postMessage(b)}function A1(){figma.showUI(q.replace("</head>",`<style>${Y}</style></head>`),{width:300,height:400,title:"Variable Inspector"}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"&&k()};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{k()},300)}),k()}A1();

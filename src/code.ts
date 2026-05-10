@@ -52,13 +52,17 @@ async function buildLayerInfoMap(
     const node = (await figma.getNodeByIdAsync(layerId)) as SceneNode | null;
     if (node) {
       const merge = mergedInfo.get(layerId);
-      layerInfoMap.set(layerId, {
+      const info: LayerInfo = {
         id: layerId,
         name: layerName,
         order,
         type: getLayerType(node),
-        ...(merge ? { count: merge.count, mergedNodeIds: merge.nodeIds } : {}),
-      });
+      };
+      if (merge) {
+        info.count = merge.count;
+        info.mergedNodeIds = merge.nodeIds;
+      }
+      layerInfoMap.set(layerId, info);
     }
   };
 

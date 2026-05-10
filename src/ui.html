@@ -974,7 +974,7 @@
       // (innerHTML="" détruit l'input, le nouveau démarre sans focus).
       let restoreSearch = null;
       const activeEl = document.activeElement;
-      if (activeEl && activeEl.classList && activeEl.classList.contains('search-input')) {
+      if (activeEl && activeEl.classList && activeEl.classList.contains('fg-search')) {
         restoreSearch = {
           start: activeEl.selectionStart,
           end: activeEl.selectionEnd,
@@ -988,7 +988,7 @@
       container.appendChild(renderToolbar());
 
       if (restoreSearch) {
-        const newSearch = container.querySelector('.search-input');
+        const newSearch = container.querySelector('.fg-search');
         if (newSearch) {
           newSearch.focus();
           try { newSearch.setSelectionRange(restoreSearch.start, restoreSearch.end); } catch (_) { /* no-op */ }

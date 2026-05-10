@@ -384,25 +384,6 @@ li {
   justify-content: space-between;
 }
 
-.sort-toggle {
-  display: inline-flex;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.sort-toggle button {
-  background: #fff;
-  border: none;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  border-right: 1px solid #ccc;
-}
-
-.sort-toggle button:last-child { border-right: none; }
-.sort-toggle button.active { background: #1969d2; color: #fff; }
-
 .property-section {
   margin-bottom: 16px;
   border-bottom: 1px solid #e6e6e6;
@@ -476,78 +457,8 @@ li {
   background-position: 0 0, 0 3px, 3px -3px, -3px 0;
 }
 
-.rescan-btn {
-  background: transparent;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 16px;
-  color: #555;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.rescan-btn:hover {
-  color: #1969d2;
-  border-color: #1969d2;
-}
-
-.rescan-btn.scanning {
-  animation: spin 1s linear infinite;
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-.search-input {
-  flex: 1;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-right: 8px;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #1969d2;
-}
-
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
-  flex-wrap: wrap;
-}
-
-.filter-label {
-  color: #666;
-  margin-right: 4px;
-}
-
-.chip {
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
-  cursor: pointer;
-  color: #555;
-  transition: all 0.15s;
-}
-
-.chip:hover {
-  border-color: #1969d2;
-  color: #1969d2;
-}
-
-.chip.active {
-  background: #1969d2;
-  color: #fff;
-  border-color: #1969d2;
 }
 
 .empty-state {

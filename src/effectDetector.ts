@@ -27,17 +27,31 @@ interface EffectWithBindings {
  * Detects unbound effect properties (blur radius, shadow offset, spread, color)
  * on a node and appends them to `unboundUsages`. Each effect in `node.effects`
  * is iterated independently so multiple drop shadows are reported separately.
+ * When a node has multiple effects of the same type, they are numbered
+ * (e.g. "Drop Shadow 1 Blur", "Drop Shadow 2 Blur"). A single effect
+ * of its type remains unnumbered (e.g. "Drop Shadow Blur").
  *
  * @param node - The scene node to check.
  * @param unboundUsages - Array to append found unbound usages to.
  */
 export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUsage[]): void {
   if (!('effects' in node) || !Array.isArray(node.effects)) return;
+  const effects = node.effects as EffectWithBindings[];
 
-  for (const effect of node.effects as EffectWithBindings[]) {
-    const boundVars = effect.boundVariables ?? {};
-    const friendlyType = formatEffectType(effect.type);
+  // Pre-count per type so single-of-its-type effects stay unnumbered
+  const counts: Record<string, number> = {};
+  for (const e of effects) counts[e.type] = (counts[e.type] ?? 0) + 1;
+
+  const seenIdx: Record<string, number> = {};
+
+  for (const effect of effects) {
+    const total = counts[effect.type];
+    seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
+    const idx = seenIdx[effect.type];
+    const baseLabel = formatEffectType(effect.type);
+    const friendlyType = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
     const isBlurOrShadow = effect.type.includes('BLUR') || effect.type.includes('SHADOW');
+    const boundVars = effect.boundVariables ?? {};
 
     if (typeof effect.radius === 'number') {
       const radiusBound = boundVars.radius as { id?: string } | undefined;

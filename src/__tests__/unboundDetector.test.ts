@@ -379,6 +379,57 @@ describe('getUnboundEffectUsages', () => {
 });
 
 // ---------------------------------------------------------------------------
+// getUnboundEffectUsages — numbering repeated effects
+// ---------------------------------------------------------------------------
+
+describe('getUnboundEffectUsages — numbering repeated effects', () => {
+  it('does not number a single effect of its type', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [{ type: 'DROP_SHADOW', radius: 4 }],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    expect(usages.some(u => u.property === 'Drop Shadow Blur')).toBe(true);
+    expect(usages.some(u => u.property === 'Drop Shadow 1 Blur')).toBe(false);
+  });
+
+  it('numbers multiple Drop Shadows 1 / 2 / 3', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [
+        { type: 'DROP_SHADOW', radius: 2 },
+        { type: 'DROP_SHADOW', radius: 4 },
+        { type: 'DROP_SHADOW', radius: 8 },
+      ],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const props = usages.map(u => u.property);
+    expect(props).toContain('Drop Shadow 1 Blur');
+    expect(props).toContain('Drop Shadow 2 Blur');
+    expect(props).toContain('Drop Shadow 3 Blur');
+  });
+
+  it('counts DROP_SHADOW and INNER_SHADOW separately', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [
+        { type: 'DROP_SHADOW', radius: 2 },
+        { type: 'INNER_SHADOW', radius: 4 },
+        { type: 'DROP_SHADOW', radius: 6 },
+      ],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const props = usages.map(u => u.property);
+    expect(props).toContain('Drop Shadow 1 Blur');
+    expect(props).toContain('Drop Shadow 2 Blur');
+    expect(props).toContain('Inner Shadow Blur');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getUnboundFloatUsages — text properties: lineHeight, letterSpacing, paragraphSpacing
 // ---------------------------------------------------------------------------
 

@@ -626,10 +626,22 @@ const Y=`<!DOCTYPE html>
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
       const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
+      // Dedup unbound entries within each layer name by
+      // (effectGroup, subProp, property, value) tuple. Multiple identical
+      // instances of a component (whether or not the plugin merged them via
+      // fingerprint) produce N copies of the same hardcoded property — show
+      // them once.
       const unboundMap = {};
       if (unbound) {
+        const unboundSeen = {};
         unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
-          if (!unboundMap[layer]) unboundMap[layer] = [];
+          if (!unboundMap[layer]) {
+            unboundMap[layer] = [];
+            unboundSeen[layer] = new Set();
+          }
+          const key = \`\${effectGroup || ''}|\${subProp || ''}|\${property}|\${value}\`;
+          if (unboundSeen[layer].has(key)) return;
+          unboundSeen[layer].add(key);
           unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }

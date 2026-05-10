@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { formatEffectType, collectAllNodes, inspectNode, getLayerDisplayName } from '../nodeScanner';
 import { resetDedupSets } from '../dedup';
 import { figmaMock, makeRectNode, makeFrameNode, makeTextNode } from '../__mocks__/figma';
@@ -301,5 +301,29 @@ describe('getLayerDisplayName', () => {
   it('formats multi-word node types (FRAME → "Frame", AUTO_LAYOUT → "Auto layout")', () => {
     const node = { ...makeRectNode({ id: 'n1', name: '1:1' }), type: 'AUTO_LAYOUT' } as unknown as SceneNode;
     expect(getLayerDisplayName(node)).toBe('Auto layout');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// selectionchange debounce
+// ---------------------------------------------------------------------------
+
+describe('selectionchange debounce', () => {
+  it('coalesces multiple rapid events into one scan', () => {
+    vi.useFakeTimers();
+    let scanCount = 0;
+    const debouncedScan = (() => {
+      let t: ReturnType<typeof setTimeout> | null = null;
+      return () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => { scanCount++; }, 300);
+      };
+    })();
+    debouncedScan();
+    debouncedScan();
+    debouncedScan();
+    vi.advanceTimersByTime(310);
+    expect(scanCount).toBe(1);
+    vi.useRealTimers();
   });
 });

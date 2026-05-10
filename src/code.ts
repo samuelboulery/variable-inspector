@@ -186,7 +186,11 @@ function initializePlugin(): void {
     }
   };
 
-  figma.on('selectionchange', () => { updateInspector(); });
+  let scanTimeout: ReturnType<typeof setTimeout> | null = null;
+  figma.on('selectionchange', () => {
+    if (scanTimeout) clearTimeout(scanTimeout);
+    scanTimeout = setTimeout(() => { updateInspector(); }, 300);
+  });
 
   updateInspector();
 }

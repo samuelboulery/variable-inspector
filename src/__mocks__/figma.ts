@@ -129,6 +129,7 @@ export function makeVariable(overrides: {
   key?: string;
   resolvedType?: VariableResolvedDataType;
   valuesByMode?: Record<string, VariableValue>;
+  variableCollectionId?: string;
 }): Variable {
   return {
     id: overrides.id ?? 'var-1',
@@ -136,9 +137,58 @@ export function makeVariable(overrides: {
     key: overrides.key ?? 'key-1',
     resolvedType: overrides.resolvedType ?? 'COLOR',
     valuesByMode: overrides.valuesByMode ?? {},
-    variableCollectionId: 'col-1',
+    variableCollectionId: overrides.variableCollectionId ?? 'col-1',
     description: '',
     hiddenFromPublishing: false,
     scopes: [],
   } as unknown as Variable;
+}
+
+/**
+ * Builds a 2-link variable alias chain: variable A's first mode points to
+ * variable B via VariableAlias, and B's first mode holds the concrete value.
+ *
+ * Returns the chain plus a hydrated `getVariableByIdAsync` resolver that the
+ * test can plug into `figmaMock.variables.getVariableByIdAsync` to walk the
+ * chain.
+ */
+export function makeAliasChain(options: {
+  rootId?: string;
+  leafId?: string;
+  leafValue?: VariableValue;
+  modeId?: string;
+  resolvedType?: VariableResolvedDataType;
+}): {
+  root: Variable;
+  leaf: Variable;
+  resolve: (id: string) => Promise<Variable | null>;
+} {
+  const rootId = options.rootId ?? 'var-root';
+  const leafId = options.leafId ?? 'var-leaf';
+  const modeId = options.modeId ?? 'mode-1';
+  const resolvedType = options.resolvedType ?? 'COLOR';
+  const leafValue = options.leafValue ?? { r: 1, g: 0, b: 0 };
+
+  const root = makeVariable({
+    id: rootId,
+    name: 'alias/root',
+    resolvedType,
+    valuesByMode: {
+      [modeId]: { type: 'VARIABLE_ALIAS', id: leafId } as unknown as VariableValue,
+    },
+  });
+  const leaf = makeVariable({
+    id: leafId,
+    name: 'alias/leaf',
+    resolvedType,
+    valuesByMode: { [modeId]: leafValue },
+  });
+
+  const resolve = async (id: string): Promise<Variable | null> => {
+    if (id === rootId) return root;
+    if (id === leafId) return leaf;
+    return null;
+  };
+
+  return { root, leaf, resolve };
 }

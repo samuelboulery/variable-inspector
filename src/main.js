@@ -1,6 +1,9 @@
 import { createLayerSection, createVariablePill } from './components.js';
 
 const SORT_KEY = 'vi.sortMode';
+const FILTER_TYPES_KEY = 'vi.filter.types';
+const FILTER_ORIGINS_KEY = 'vi.filter.origins';
+const SEARCH_KEY = 'vi.search';
 
 /**
  * Retrieves the current sort mode from localStorage.
@@ -18,35 +21,110 @@ function setSortMode(mode) {
 }
 
 /**
- * Creates and returns the toolbar element with sort toggle buttons and rescan button.
+ * Retrieves the current filter state from localStorage.
+ */
+function getFilterState() {
+  let types = [];
+  let origins = [];
+  try { types = JSON.parse(localStorage.getItem(FILTER_TYPES_KEY) || '[]'); } catch {}
+  try { origins = JSON.parse(localStorage.getItem(FILTER_ORIGINS_KEY) || '[]'); } catch {}
+  return {
+    search: localStorage.getItem(SEARCH_KEY) || '',
+    types: Array.isArray(types) ? types : [],
+    origins: Array.isArray(origins) ? origins : [],
+  };
+}
+
+/**
+ * Persists the filter state to localStorage.
+ */
+function setFilterState(filter) {
+  localStorage.setItem(SEARCH_KEY, filter.search);
+  localStorage.setItem(FILTER_TYPES_KEY, JSON.stringify(filter.types));
+  localStorage.setItem(FILTER_ORIGINS_KEY, JSON.stringify(filter.origins));
+}
+
+/**
+ * Escapes HTML special characters to prevent XSS.
+ */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+/**
+ * Creates and returns the toolbar element with search, filter chips, sort toggle, and rescan button.
  *
- * @param {Function} onSortChange - Callback invoked with the new sort mode when toggle is clicked.
+ * @param {Function} onChange - Callback invoked when any control changes.
  * @returns {HTMLElement} The toolbar div element.
  */
-function renderToolbar(onSortChange) {
+function renderToolbar(onChange) {
   const toolbar = document.createElement('div');
   toolbar.className = 'toolbar';
+  const filter = getFilterState();
   toolbar.innerHTML = `
+    <div class="toolbar-row">
+      <input class="search-input" type="text" placeholder="🔍 Rechercher..." value="${escapeHtml(filter.search)}" />
+      <button class="rescan-btn" title="Re-scan selection">⟳</button>
+    </div>
     <div class="toolbar-row">
       <div class="sort-toggle">
         <button data-mode="byLayer">Par calque</button>
         <button data-mode="byProperty">Par propriété</button>
       </div>
-      <button class="rescan-btn" title="Re-scan selection">⟳</button>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Type:</span>
+      <button class="chip" data-filter="type" data-value="COLOR">Color</button>
+      <button class="chip" data-filter="type" data-value="FLOAT">Float</button>
+      <button class="chip" data-filter="type" data-value="STRING">String</button>
+      <button class="chip" data-filter="type" data-value="BOOLEAN">Bool</button>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Origine:</span>
+      <button class="chip" data-filter="origin" data-value="local">Local</button>
+      <button class="chip" data-filter="origin" data-value="external">External</button>
     </div>
   `;
-  const current = getSortMode();
+
+  const sortMode = getSortMode();
   toolbar.querySelectorAll('button[data-mode]').forEach(btn => {
-    if (btn.dataset.mode === current) btn.classList.add('active');
+    if (btn.dataset.mode === sortMode) btn.classList.add('active');
     btn.addEventListener('click', () => {
-      const next = btn.dataset.mode;
-      setSortMode(next);
-      onSortChange(next);
+      setSortMode(btn.dataset.mode);
+      onChange();
     });
   });
+
+  toolbar.querySelectorAll('.chip').forEach(chip => {
+    const f = chip.dataset.filter;
+    const v = chip.dataset.value;
+    const arr = f === 'type' ? filter.types : filter.origins;
+    if (arr.includes(v)) chip.classList.add('active');
+    chip.addEventListener('click', () => {
+      const cur = getFilterState();
+      const target = f === 'type' ? cur.types : cur.origins;
+      const idx = target.indexOf(v);
+      if (idx >= 0) target.splice(idx, 1); else target.push(v);
+      setFilterState(cur);
+      onChange();
+    });
+  });
+
+  let searchTimer = null;
+  toolbar.querySelector('.search-input').addEventListener('input', (ev) => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      const cur = getFilterState();
+      cur.search = ev.target.value;
+      setFilterState(cur);
+      onChange();
+    }, 150);
+  });
+
   toolbar.querySelector('.rescan-btn').addEventListener('click', () => {
     parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
   });
+
   return toolbar;
 }
 
@@ -97,6 +175,7 @@ function handleRenderMessage(message) {
 
 /**
  * Renders the main body content (either byLayer or byProperty mode).
+ * Applies filter state before rendering.
  *
  * @param {HTMLElement} app - The app container element.
  * @param {object} message - RenderMessage from the plugin thread.
@@ -117,52 +196,84 @@ function renderBody(app, message) {
     return;
   }
 
+  // Apply filter to byLayer entries
+  const filter = getFilterState();
+  const filteredByLayer = {};
+  for (const [layerId, entries] of Object.entries(message.byLayer)) {
+    const q = filter.search.trim().toLowerCase();
+    const kept = entries.filter(e => {
+      if (q && !(
+        e.layer.toLowerCase().includes(q) ||
+        e.property.toLowerCase().includes(q) ||
+        e.name.toLowerCase().includes(q)
+      )) return false;
+      if (filter.types.length > 0 && !filter.types.includes(e.type)) return false;
+      if (filter.origins.length > 0 && !filter.origins.includes(e.origin)) return false;
+      return true;
+    });
+    if (kept.length > 0) filteredByLayer[layerId] = kept;
+  }
+
   const sortMode = getSortMode();
 
   if (sortMode === 'byLayer') {
-    const layerIds = Object.keys(message.byLayer).sort((a, b) => {
+    const layerIds = Object.keys(filteredByLayer).sort((a, b) => {
       const orderA = message.layerInfoMap[a]?.order ?? 0;
       const orderB = message.layerInfoMap[b]?.order ?? 0;
       return orderA - orderB;
     });
-    layerIds.forEach(layerId => {
-      const layerInfo = message.layerInfoMap[layerId];
-      if (!layerInfo) return;
-      const variables = message.byLayer[layerId];
-      body.appendChild(createLayerSection(layerInfo, variables));
-    });
+    if (layerIds.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-state';
+      empty.textContent = 'No results match the current filters.';
+      body.appendChild(empty);
+    } else {
+      layerIds.forEach(layerId => {
+        const layerInfo = message.layerInfoMap[layerId];
+        if (!layerInfo) return;
+        const variables = filteredByLayer[layerId];
+        body.appendChild(createLayerSection(layerInfo, variables));
+      });
+    }
   } else {
     // byProperty mode — flat list grouped by property
-    const all = Object.values(message.byLayer).flat();
-    const byProp = {};
-    for (const e of all) {
-      if (!byProp[e.property]) byProp[e.property] = [];
-      byProp[e.property].push(e);
-    }
-    const props = Object.keys(byProp).sort();
-    props.forEach(prop => {
-      const section = document.createElement('div');
-      section.className = 'property-section';
-      const h = document.createElement('h2');
-      h.textContent = `${prop} (${byProp[prop].length})`;
-      section.appendChild(h);
-      byProp[prop].forEach(entry => {
-        const row = document.createElement('div');
-        row.className = 'property-row';
-        const layerLabel = document.createElement('span');
-        layerLabel.className = 'property-row-layer';
-        layerLabel.textContent = entry.layer;
-        layerLabel.style.cursor = 'pointer';
-        layerLabel.addEventListener('click', () => {
-          parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: entry.layerId } }, '*');
+    const all = Object.values(filteredByLayer).flat();
+    if (all.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-state';
+      empty.textContent = 'No results match the current filters.';
+      body.appendChild(empty);
+    } else {
+      const byProp = {};
+      for (const e of all) {
+        if (!byProp[e.property]) byProp[e.property] = [];
+        byProp[e.property].push(e);
+      }
+      const props = Object.keys(byProp).sort();
+      props.forEach(prop => {
+        const section = document.createElement('div');
+        section.className = 'property-section';
+        const h = document.createElement('h2');
+        h.textContent = `${prop} (${byProp[prop].length})`;
+        section.appendChild(h);
+        byProp[prop].forEach(entry => {
+          const row = document.createElement('div');
+          row.className = 'property-row';
+          const layerLabel = document.createElement('span');
+          layerLabel.className = 'property-row-layer';
+          layerLabel.textContent = entry.layer;
+          layerLabel.style.cursor = 'pointer';
+          layerLabel.addEventListener('click', () => {
+            parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: entry.layerId } }, '*');
+          });
+          row.appendChild(layerLabel);
+          row.appendChild(document.createTextNode(' → '));
+          row.appendChild(createVariablePill(entry));
+          section.appendChild(row);
         });
-        row.appendChild(layerLabel);
-        row.appendChild(document.createTextNode(' → '));
-        row.appendChild(createVariablePill(entry));
-        section.appendChild(row);
+        body.appendChild(section);
       });
-      body.appendChild(section);
-    });
+    }
   }
 
   if (message.unbound && message.unbound.length > 0) {

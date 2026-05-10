@@ -48,3 +48,27 @@ export function computeStats(
     scanDurationMs,
   };
 }
+
+export interface FilterState {
+  search: string;
+  types: Array<'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN'>;
+  origins: Array<'local' | 'external'>;
+}
+
+/**
+ * Filters usage entries by search query, type, and origin.
+ * All filters are combined with AND logic.
+ */
+export function filterUsages(entries: FullUsageEntry[], filter: FilterState): FullUsageEntry[] {
+  const q = filter.search.trim().toLowerCase();
+  return entries.filter(e => {
+    if (q && !(
+      e.layer.toLowerCase().includes(q) ||
+      e.property.toLowerCase().includes(q) ||
+      e.name.toLowerCase().includes(q)
+    )) return false;
+    if (filter.types.length > 0 && !filter.types.includes(e.type as FilterState['types'][number])) return false;
+    if (filter.origins.length > 0 && !filter.origins.includes(e.origin)) return false;
+    return true;
+  });
+}

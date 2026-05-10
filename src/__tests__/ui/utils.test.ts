@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { regroupByProperty, computeStats } from '../../ui/utils';
+import { regroupByProperty, computeStats, filterUsages } from '../../ui/utils';
 import { FullUsageEntry } from '../../types';
 
 function entry(overrides: Partial<FullUsageEntry>): FullUsageEntry {
@@ -60,5 +60,34 @@ describe('computeStats', () => {
     const unbound = [{ layer: 'a', layerId: 'l1', property: 'Fill', value: 'rgb(0,0,0)' }];
     const s = computeStats(byLayer, unbound, 0);
     expect(s.variableCoverage).toBeCloseTo(4 / 5);
+  });
+});
+
+describe('filterUsages', () => {
+  it('matches case-insensitive on layer/property/name', () => {
+    const e = entry({ layer: 'Card', property: 'Fill', name: 'color/primary' });
+    expect(filterUsages([e], { search: 'card', types: [], origins: [] })).toHaveLength(1);
+    expect(filterUsages([e], { search: 'PRIMARY', types: [], origins: [] })).toHaveLength(1);
+    expect(filterUsages([e], { search: 'fill', types: [], origins: [] })).toHaveLength(1);
+    expect(filterUsages([e], { search: 'nope', types: [], origins: [] })).toHaveLength(0);
+  });
+
+  it('filters by type when types array is non-empty', () => {
+    const a = entry({ type: 'COLOR' });
+    const b = entry({ type: 'FLOAT' });
+    expect(filterUsages([a, b], { search: '', types: ['COLOR'], origins: [] })).toHaveLength(1);
+    expect(filterUsages([a, b], { search: '', types: ['COLOR', 'FLOAT'], origins: [] })).toHaveLength(2);
+  });
+
+  it('filters by origin when origins array is non-empty', () => {
+    const a = entry({ origin: 'local' });
+    const b = entry({ origin: 'external' });
+    expect(filterUsages([a, b], { search: '', types: [], origins: ['external'] })).toHaveLength(1);
+  });
+
+  it('combines filters with AND', () => {
+    const a = entry({ layer: 'Card', type: 'COLOR', origin: 'local' });
+    const b = entry({ layer: 'Card', type: 'FLOAT', origin: 'local' });
+    expect(filterUsages([a, b], { search: 'card', types: ['COLOR'], origins: ['local'] })).toHaveLength(1);
   });
 });

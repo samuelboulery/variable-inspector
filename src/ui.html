@@ -147,6 +147,14 @@
       const pill = document.createElement("span");
       pill.className = `variable-pill ${item.origin}-variable`;
 
+      // Color swatch pour les variables COLOR
+      if (item.type === 'COLOR' && item.colorValue) {
+        const swatch = document.createElement('span');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = formatRGBA(item.colorValue);
+        pill.appendChild(swatch);
+      }
+
       // Ajouter l'icône de type de variable
       const typeIcon = createVariableTypeIconElement(item.type);
       if (typeIcon) {

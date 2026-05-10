@@ -11,6 +11,7 @@ import {
   scanVisibility,
   scanTextDecoration,
 } from './propertyScanner';
+import { scanComponentProperties } from './componentProps';
 
 // Re-exported so existing imports from './nodeScanner' keep working.
 export { getLayerDisplayName };
@@ -262,6 +263,10 @@ export function inspectNode(node: SceneNode): VariableUsage[] {
   if (node.type === 'TEXT') {
     getTextNodeVariables(node as TextNode, usages);
     scanTextDecoration(node as TextNode, usages);
+  }
+
+  if (node.type === 'INSTANCE') {
+    scanComponentProperties(node as InstanceNode, usages);
   }
 
   getNodeBoundVariables(node, usages);

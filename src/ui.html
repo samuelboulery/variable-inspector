@@ -949,11 +949,32 @@
         });
       }
       const container = document.getElementById("app");
+
+      // Préserver focus + caret de l'input de recherche pendant le re-render.
+      // Sans ça, taper dans le search perd le focus à chaque debounce-fire
+      // (innerHTML="" détruit l'input, le nouveau démarre sans focus).
+      let restoreSearch = null;
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.classList && activeEl.classList.contains('search-input')) {
+        restoreSearch = {
+          start: activeEl.selectionStart,
+          end: activeEl.selectionEnd,
+        };
+      }
+
       container.innerHTML = "";
 
       // Toolbar (rescan button + futurs controls) — toujours rendu, même
       // sur empty state, pour permettre à l'utilisateur de relancer un scan.
       container.appendChild(renderToolbar());
+
+      if (restoreSearch) {
+        const newSearch = container.querySelector('.search-input');
+        if (newSearch) {
+          newSearch.focus();
+          try { newSearch.setSelectionRange(restoreSearch.start, restoreSearch.end); } catch (_) { /* no-op */ }
+        }
+      }
 
       // Vérifier s'il n'y a aucune variable ni propriété non liée
       if (noVariablesFound) {

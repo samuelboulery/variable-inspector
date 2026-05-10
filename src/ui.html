@@ -203,6 +203,7 @@
 
     // Cache du dernier message render pour re-render après toggle sort/filter
     let lastRender = null;
+    let filtersExpanded = false;
 
     // Singleton: pill actuellement ouvert (single-open semantics)
     let openPathBox = null;
@@ -691,36 +692,49 @@
       const toolbar = document.createElement('div');
       toolbar.className = 'toolbar';
       const filter = getFilterState();
+      const activeFilterCount = filter.types.length + filter.origins.length;
+      const expanded = filtersExpanded;
       toolbar.innerHTML = `
         <div class="toolbar-row">
-          <input class="search-input" type="text" placeholder="🔍 Rechercher..." value="${escapeHtml(filter.search)}" />
-          <button class="rescan-btn" title="Re-scan selection">⟳</button>
+          <input class="fg-search" type="text" placeholder="Rechercher" value="${escapeHtml(filter.search)}" />
+          <button class="fg-ghost fg-rescan" title="Re-scan selection" aria-label="Re-scan">
+            <svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
         </div>
         <div class="toolbar-row">
-          <div class="sort-toggle">
-            <button data-mode="byLayer">Par calque</button>
-            <button data-mode="byProperty">Par propriété</button>
+          <div class="fg-seg">
+            <button data-mode="byLayer">Calque</button>
+            <button data-mode="byProperty">Propriété</button>
           </div>
+          <span style="flex:1"></span>
+          <button class="fg-filter-btn" data-expanded="${expanded ? 'true' : 'false'}" aria-expanded="${expanded ? 'true' : 'false'}">
+            Filtres${activeFilterCount > 0 ? ` <span class="fg-badge">${activeFilterCount}</span>` : ''}
+            <svg class="fg-caret" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
-        <div class="filter-row">
-          <span class="filter-label">Type:</span>
-          <button class="chip" data-filter="type" data-value="COLOR">Color</button>
-          <button class="chip" data-filter="type" data-value="FLOAT">Float</button>
-          <button class="chip" data-filter="type" data-value="STRING">String</button>
-          <button class="chip" data-filter="type" data-value="BOOLEAN">Bool</button>
-        </div>
-        <div class="filter-row">
-          <span class="filter-label">Origine:</span>
-          <button class="chip" data-filter="origin" data-value="local">Local</button>
-          <button class="chip" data-filter="origin" data-value="external">External</button>
-        </div>
+        ${expanded ? `
+        <div class="fg-filters">
+          <div class="fg-frow">
+            <span class="fg-flabel">Type</span>
+            <button class="fg-chip" data-filter="type" data-value="COLOR">Color</button>
+            <button class="fg-chip" data-filter="type" data-value="FLOAT">Float</button>
+            <button class="fg-chip" data-filter="type" data-value="STRING">String</button>
+            <button class="fg-chip" data-filter="type" data-value="BOOLEAN">Bool</button>
+          </div>
+          <div class="fg-frow">
+            <span class="fg-flabel">Origine</span>
+            <button class="fg-chip" data-filter="origin" data-value="local">Local</button>
+            <button class="fg-chip" data-filter="origin" data-value="external">External</button>
+          </div>
+        </div>` : ''}
       `;
-      toolbar.querySelector('.rescan-btn').addEventListener('click', () => {
+
+      toolbar.querySelector('.fg-rescan').addEventListener('click', () => {
         parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
       });
 
       const currentSort = getSortMode();
-      toolbar.querySelectorAll('button[data-mode]').forEach(btn => {
+      toolbar.querySelectorAll('.fg-seg button').forEach(btn => {
         if (btn.dataset.mode === currentSort) btn.classList.add('active');
         btn.addEventListener('click', () => {
           if (btn.dataset.mode === getSortMode()) return;
@@ -729,7 +743,12 @@
         });
       });
 
-      toolbar.querySelectorAll('.chip').forEach(chip => {
+      toolbar.querySelector('.fg-filter-btn').addEventListener('click', () => {
+        filtersExpanded = !filtersExpanded;
+        if (lastRender) handlePluginMessage(lastRender);
+      });
+
+      toolbar.querySelectorAll('.fg-chip').forEach(chip => {
         const f = chip.dataset.filter;
         const v = chip.dataset.value;
         const arr = f === 'type' ? filter.types : filter.origins;
@@ -745,7 +764,7 @@
       });
 
       let searchTimer = null;
-      const searchInput = toolbar.querySelector('.search-input');
+      const searchInput = toolbar.querySelector('.fg-search');
       searchInput.addEventListener('input', (ev) => {
         if (searchTimer) clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
@@ -917,7 +936,7 @@
       // afficher le spinner. Ne touche pas au reste du DOM — le contenu
       // précédent reste affiché pendant le scan.
       if (msg.type === 'scan-start') {
-        document.querySelectorAll('.rescan-btn').forEach(b => b.classList.add('scanning'));
+        document.querySelectorAll('.fg-rescan').forEach(b => b.classList.add('scanning'));
         return;
       }
 

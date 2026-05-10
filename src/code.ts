@@ -8,6 +8,7 @@ import { resetDedupSets } from './dedup';
 import { loadVariables } from './variableLoader';
 import { inspectNode, collectAllNodes } from './nodeScanner';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
+import { groupByFingerprint } from './instanceFingerprint';
 import { logger } from './utils/logger';
 
 /**
@@ -35,11 +36,13 @@ function getLayerType(node: SceneNode): string {
  *
  * @param allUsages - Enriched variable usage entries.
  * @param unboundUsages - Hardcoded property entries.
+ * @param mergedInfo - Map of node IDs to merge metadata (count and nodeIds for identical instances).
  * @returns Map from layerId to LayerInfo metadata.
  */
 async function buildLayerInfoMap(
   allUsages: FullUsageEntry[],
   unboundUsages: UnboundUsage[],
+  mergedInfo: Map<string, { count: number; nodeIds: string[] }>,
 ): Promise<Map<string, LayerInfo>> {
   const layerInfoMap = new Map<string, LayerInfo>();
 
@@ -47,7 +50,14 @@ async function buildLayerInfoMap(
     if (layerInfoMap.has(layerId)) return;
     const node = (await figma.getNodeByIdAsync(layerId)) as SceneNode | null;
     if (node) {
-      layerInfoMap.set(layerId, { id: layerId, name: layerName, order, type: getLayerType(node) });
+      const merge = mergedInfo.get(layerId);
+      layerInfoMap.set(layerId, {
+        id: layerId,
+        name: layerName,
+        order,
+        type: getLayerType(node),
+        ...(merge ? { count: merge.count, mergedNodeIds: merge.nodeIds } : {}),
+      });
     }
   };
 
@@ -127,25 +137,37 @@ async function runInspector(): Promise<void> {
   const selection = figma.currentPage.selection;
   const allNodes = collectAllNodes(selection);
 
+  const groups = groupByFingerprint(allNodes);
   const allUsages: FullUsageEntry[] = [];
   const unboundUsages: UnboundUsage[] = [];
+  const mergedInfo = new Map<string, { count: number; nodeIds: string[] }>();
 
-  for (const node of allNodes) {
-    const nodeUsages = inspectNode(node);
+  for (const [, bucket] of groups) {
+    const representative = bucket[0];
+    const isMerged = bucket.length > 1 && representative.type === 'INSTANCE';
+
+    if (isMerged) {
+      mergedInfo.set(representative.id, {
+        count: bucket.length,
+        nodeIds: bucket.map(n => n.id),
+      });
+    }
+
+    const nodeUsages = inspectNode(representative);
     for (const { layer, property, id } of nodeUsages) {
       const def = vars.get(id);
       allUsages.push(
         def
-          ? { layer, layerId: node.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id }
-          : { layer, layerId: node.id, property, name: id, type: 'STRING', origin: 'external', id },
+          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id }
+          : { layer, layerId: representative.id, property, name: id, type: 'STRING', origin: 'external', id },
       );
     }
-    getUnboundColorUsages(node, unboundUsages);
-    getUnboundFloatUsages(node, unboundUsages);
-    getUnboundEffectUsages(node, unboundUsages);
+    getUnboundColorUsages(representative, unboundUsages);
+    getUnboundFloatUsages(representative, unboundUsages);
+    getUnboundEffectUsages(representative, unboundUsages);
   }
 
-  const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages);
+  const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages, mergedInfo);
   const byLayer = groupUsagesByLayer(allUsages);
 
   logger.log('Final usages count:', allUsages.length);

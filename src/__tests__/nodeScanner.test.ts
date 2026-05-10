@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { formatEffectType, collectAllNodes, inspectNode } from '../nodeScanner';
+import { formatEffectType, collectAllNodes, inspectNode, getLayerDisplayName } from '../nodeScanner';
 import { resetDedupSets } from '../dedup';
-import { makeRectNode, makeFrameNode, makeTextNode } from '../__mocks__/figma';
+import { figmaMock, makeRectNode, makeFrameNode, makeTextNode } from '../__mocks__/figma';
 
 beforeEach(() => {
   resetDedupSets();
@@ -212,5 +212,94 @@ describe('inspectNode', () => {
     expect(props).toContain('Fill');
     expect(props).toContain('Stroke Color');
     expect(props).toContain('Corner Radius');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLayerDisplayName
+// ---------------------------------------------------------------------------
+
+describe('getLayerDisplayName', () => {
+  beforeEach(() => {
+    figmaMock.getNodeById = (_id: string) => null;
+  });
+
+  it('returns the node name when it is already human-readable', () => {
+    const node = makeRectNode({ id: 'n1', name: 'Hero Image' });
+    expect(getLayerDisplayName(node)).toBe('Hero Image');
+  });
+
+  it('walks the parent chain when the node name is a Figma sublayer ID', () => {
+    const grandparent = { name: 'Card Component', type: 'COMPONENT' } as unknown as BaseNode;
+    const parent = { name: '120:11083', type: 'INSTANCE', parent: grandparent } as unknown as BaseNode;
+    const node = { ...makeRectNode({ id: 'n1', name: '120:11084' }), parent } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Card Component');
+  });
+
+  it('skips PAGE and DOCUMENT ancestors when walking the parent chain', () => {
+    const page = { name: 'Page 1', type: 'PAGE' } as unknown as BaseNode;
+    const doc = { name: 'Doc', type: 'DOCUMENT', parent: null } as unknown as BaseNode;
+    const directParent = { name: '50:60', type: 'FRAME', parent: page } as unknown as BaseNode;
+    (page as unknown as { parent: BaseNode }).parent = doc;
+    const node = { ...makeRectNode({ id: 'n1', name: '70:80' }), parent: directParent } as unknown as SceneNode;
+    // No real ancestor name found → falls back to formatted type label
+    expect(getLayerDisplayName(node)).toBe('Rectangle');
+  });
+
+  it('caps the parent walk at 10 levels to prevent infinite loops', () => {
+    // Build a chain of 15 unnamed ancestors
+    let current: BaseNode = { name: '99:99', type: 'FRAME', parent: null } as unknown as BaseNode;
+    for (let i = 0; i < 14; i++) {
+      const parent = { name: `${i}:${i}`, type: 'FRAME', parent: null } as unknown as BaseNode;
+      (current as unknown as { parent: BaseNode }).parent = parent;
+      current = parent;
+    }
+    const node = { ...makeRectNode({ id: 'n1', name: '100:100' }), parent: current } as unknown as SceneNode;
+    // No real ancestor reachable within depth 10 → fallback to type
+    expect(getLayerDisplayName(node)).toBe('Rectangle');
+  });
+
+  it('uses the COMPONENT_SET parent name for a COMPONENT with Figma-ID name', () => {
+    const set = { name: 'Button Variants', type: 'COMPONENT_SET' } as unknown as BaseNode;
+    const node = { ...makeRectNode({ id: 'n1', name: '10:20' }), type: 'COMPONENT', parent: set } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Button Variants');
+  });
+
+  it('resolves an INSTANCE name through its mainComponent', () => {
+    const main = { name: 'Avatar', parent: null } as unknown as ComponentNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '12:34' }),
+      type: 'INSTANCE',
+      mainComponent: main,
+    } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Avatar');
+  });
+
+  it('resolves an INSTANCE name through its mainComponent → COMPONENT_SET parent', () => {
+    const set = { name: 'Icon Set', type: 'COMPONENT_SET' } as unknown as BaseNode;
+    const main = { name: '99:99', parent: set } as unknown as ComponentNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '12:34' }),
+      type: 'INSTANCE',
+      mainComponent: main,
+    } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Icon Set');
+  });
+
+  it('resolves I-prefixed sublayer IDs by looking up the embedded instance node', () => {
+    const container = { id: '120:11085', name: 'Card', type: 'FRAME', parent: null } as unknown as SceneNode;
+    figmaMock.getNodeById = (id: string) => (id === '120:11085' ? (container as unknown as BaseNode) : null);
+    const node = { ...makeRectNode({ id: 'n1', name: 'I120:11085;62:3213' }) } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Card');
+  });
+
+  it('falls back to a formatted type label when no ancestor and no instance lookup work', () => {
+    const node = makeRectNode({ id: 'n1', name: '10:20' });
+    expect(getLayerDisplayName(node)).toBe('Rectangle');
+  });
+
+  it('formats multi-word node types (FRAME → "Frame", AUTO_LAYOUT → "Auto layout")', () => {
+    const node = { ...makeRectNode({ id: 'n1', name: '1:1' }), type: 'AUTO_LAYOUT' } as unknown as SceneNode;
+    expect(getLayerDisplayName(node)).toBe('Auto layout');
   });
 });

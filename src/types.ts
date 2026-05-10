@@ -96,8 +96,13 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** Sent by the plugin thread to announce that a scan has started — UI shows loading state. */
+export interface ScanStartMessage {
+  type: 'scan-start';
+}
+
 /** Union of all messages the plugin thread can send to the UI. */
-export type PluginToUIMessage = RenderMessage | ErrorMessage;
+export type PluginToUIMessage = RenderMessage | ErrorMessage | ScanStartMessage;
 
 /** Sent by the UI thread to select and focus a node in the canvas. */
 export interface SelectNodeMessage {
@@ -112,8 +117,13 @@ export interface ResizeMessage {
   height: number;
 }
 
+/** Sent by the UI thread to request a forced re-scan of the current selection. */
+export interface RescanMessage {
+  type: 'rescan';
+}
+
 /** Union of all messages the UI thread can send to the plugin thread. */
-export type UIToPluginMessage = SelectNodeMessage | ResizeMessage;
+export type UIToPluginMessage = SelectNodeMessage | ResizeMessage | RescanMessage;
 
 /** Sort modes for the UI's main rendering. */
 export type SortMode = 'byLayer' | 'byProperty';

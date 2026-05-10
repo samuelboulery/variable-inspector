@@ -134,6 +134,7 @@ async function updateInspector(): Promise<void> {
 async function runInspector(): Promise<void> {
   resetDedupSets();
   const startMs = Date.now();
+  figma.ui.postMessage({ type: 'scan-start' } as PluginToUIMessage);
 
   const vars = await loadVariables();
   const selection = figma.currentPage.selection;
@@ -212,6 +213,8 @@ function initializePlugin(): void {
         figma.currentPage.selection = [node];
         figma.viewport.scrollAndZoomIntoView([node]);
       }
+    } else if (msg.type === 'rescan') {
+      updateInspector();
     }
   };
 

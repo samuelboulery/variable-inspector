@@ -18,7 +18,7 @@ function setSortMode(mode) {
 }
 
 /**
- * Creates and returns the toolbar element with sort toggle buttons.
+ * Creates and returns the toolbar element with sort toggle buttons and rescan button.
  *
  * @param {Function} onSortChange - Callback invoked with the new sort mode when toggle is clicked.
  * @returns {HTMLElement} The toolbar div element.
@@ -27,9 +27,12 @@ function renderToolbar(onSortChange) {
   const toolbar = document.createElement('div');
   toolbar.className = 'toolbar';
   toolbar.innerHTML = `
-    <div class="sort-toggle">
-      <button data-mode="byLayer">Par calque</button>
-      <button data-mode="byProperty">Par propriété</button>
+    <div class="toolbar-row">
+      <div class="sort-toggle">
+        <button data-mode="byLayer">Par calque</button>
+        <button data-mode="byProperty">Par propriété</button>
+      </div>
+      <button class="rescan-btn" title="Re-scan selection">⟳</button>
     </div>
   `;
   const current = getSortMode();
@@ -40,6 +43,9 @@ function renderToolbar(onSortChange) {
       setSortMode(next);
       onSortChange(next);
     });
+  });
+  toolbar.querySelector('.rescan-btn').addEventListener('click', () => {
+    parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
   });
   return toolbar;
 }
@@ -241,10 +247,15 @@ function handlePluginMessage(event) {
   if (!message) return;
 
   switch (message.type) {
+    case 'scan-start':
+      document.querySelectorAll('.rescan-btn').forEach(b => b.classList.add('scanning'));
+      break;
     case 'render':
+      document.querySelectorAll('.rescan-btn').forEach(b => b.classList.remove('scanning'));
       handleRenderMessage(message);
       break;
     case 'error':
+      document.querySelectorAll('.rescan-btn').forEach(b => b.classList.remove('scanning'));
       handleErrorMessage(message);
       break;
     default:

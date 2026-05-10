@@ -361,6 +361,12 @@ li {
   z-index: 10;
 }
 
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .sort-toggle {
   display: inline-flex;
   border: 1px solid #ccc;
@@ -451,4 +457,28 @@ li {
     linear-gradient(-45deg, transparent 75%, #ccc 75%);
   background-size: 6px 6px;
   background-position: 0 0, 0 3px, 3px -3px, -3px 0;
+}
+
+.rescan-btn {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #555;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rescan-btn:hover {
+  color: #1969d2;
+  border-color: #1969d2;
+}
+
+.rescan-btn.scanning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

@@ -622,10 +622,31 @@
       return ul;
     }
 
+    // Construit le dashboard de stats affiché au-dessus des layer-sections
+    function renderStats(stats) {
+      const dashboard = document.createElement('div');
+      dashboard.className = 'stats-dashboard';
+      const coveragePct = Math.round(stats.variableCoverage * 100);
+      dashboard.innerHTML = `
+        <div class="stats-line">
+          <strong>${stats.totalVariables}</strong> variables
+          • <strong>${stats.totalHardcoded}</strong> hardcoded (${100 - coveragePct}%)
+        </div>
+        <div class="stats-line">
+          <strong>${stats.byOrigin.local}</strong> local • <strong>${stats.byOrigin.external}</strong> external
+        </div>
+        <div class="stats-bar">
+          <div class="stats-bar-fill" style="width: ${coveragePct}%"></div>
+          <span class="stats-bar-label">Coverage : ${coveragePct}%</span>
+        </div>
+      `;
+      return dashboard;
+    }
+
     // --- window.onmessage handler moved below all definitions ---
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
-      const { byLayer, unbound, layerInfoMap, instancesByName, noVariablesFound } = msg;
+      const { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
       // Dedup unbound entries within each layer name by
       // (effectGroup, subProp, property, value) tuple. Multiple identical
       // instances of a component (whether or not the plugin merged them via
@@ -661,6 +682,11 @@
         `;
         container.appendChild(emptyMessage);
         return;
+      }
+
+      // Dashboard de stats en tête de panneau (avant la liste des calques)
+      if (stats) {
+        container.appendChild(renderStats(stats));
       }
 
       // Prépare les informations pour l'affichage

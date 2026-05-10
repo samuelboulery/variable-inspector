@@ -2,6 +2,7 @@
 
 import { VariableDefinition } from './types';
 import { inspectNode, collectAllNodes } from './nodeScanner';
+import { resolveVariablePath } from './variablePathResolver';
 import { logger } from './utils/logger';
 
 /**
@@ -54,11 +55,13 @@ async function loadLocalVariables(variableMap: Map<string, VariableDefinition>):
     for (const id of col.variableIds) {
       const variable = await figma.variables.getVariableByIdAsync(id);
       if (!variable) continue;
+      const path = await resolveVariablePath(variable, false);
       variableMap.set(id, {
         name: variable.name,
         type: variable.resolvedType,
         origin: 'local',
         colorValue: resolveColorValue(variable),
+        path,
       });
     }
   }
@@ -89,21 +92,25 @@ async function loadExternalVariables(variableMap: Map<string, VariableDefinition
       if (!variable) continue;
 
       // Store original name as fallback before attempting published import
+      const fallbackPath = await resolveVariablePath(variable, true);
       variableMap.set(id, {
         name: variable.name,
         type: variable.resolvedType,
         origin: 'external',
         colorValue: resolveColorValue(variable),
+        path: fallbackPath,
       });
 
       if (typeof figma.variables.importVariableByKeyAsync === 'function') {
         const imported = await figma.variables.importVariableByKeyAsync(variable.key);
         if (imported) {
+          const importedPath = await resolveVariablePath(imported, true);
           variableMap.set(id, {
             name: imported.name,
             type: imported.resolvedType,
             origin: 'external',
             colorValue: resolveColorValue(imported),
+            path: importedPath,
           });
         }
       }

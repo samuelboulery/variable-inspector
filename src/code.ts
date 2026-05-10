@@ -158,7 +158,7 @@ async function runInspector(): Promise<void> {
       const def = vars.get(id);
       allUsages.push(
         def
-          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id }
+          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id, path: def.path }
           : { layer, layerId: representative.id, property, name: id, type: 'STRING', origin: 'external', id },
       );
     }

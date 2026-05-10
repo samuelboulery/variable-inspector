@@ -10,6 +10,7 @@
 const figmaMock = {
   variables: {
     getLocalVariableCollections: (): VariableCollection[] => [],
+    getLocalVariableCollectionsAsync: async (): Promise<VariableCollection[]> => [],
     getVariableByIdAsync: async (_id: string): Promise<Variable | null> => null,
     importVariableByKeyAsync: async (_key: string): Promise<Variable | null> => null,
   },
@@ -17,6 +18,7 @@ const figmaMock = {
     selection: [] as SceneNode[],
   },
   getNodeById: (_id: string): BaseNode | null => null,
+  getNodeByIdAsync: async (_id: string): Promise<BaseNode | null> => null,
   ui: {
     postMessage: (_msg: unknown): void => { /* stub */ },
     resize: (_w: number, _h: number): void => { /* stub */ },

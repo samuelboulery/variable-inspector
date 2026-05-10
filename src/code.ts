@@ -2,7 +2,7 @@
 import uiHtml from './ui.html?raw';
 import css from './style.css?raw';
 
-import { FullUsageEntry, UnboundUsage, LayerInfo } from './types';
+import { FullUsageEntry, UnboundUsage, LayerInfo, PluginToUIMessage, UIToPluginMessage } from './types';
 import { SPACING_PROPERTY_KEYS } from './constants';
 import { resetDedupSets } from './dedup';
 import { loadVariables } from './variableLoader';
@@ -37,22 +37,28 @@ function getLayerType(node: SceneNode): string {
  * @param unboundUsages - Hardcoded property entries.
  * @returns Map from layerId to LayerInfo metadata.
  */
-function buildLayerInfoMap(
+async function buildLayerInfoMap(
   allUsages: FullUsageEntry[],
   unboundUsages: UnboundUsage[],
-): Map<string, LayerInfo> {
+): Promise<Map<string, LayerInfo>> {
   const layerInfoMap = new Map<string, LayerInfo>();
 
-  const tryAdd = (layerId: string, layerName: string, order: number): void => {
+  const tryAdd = async (layerId: string, layerName: string, order: number): Promise<void> => {
     if (layerInfoMap.has(layerId)) return;
-    const node = figma.getNodeById(layerId) as SceneNode | null;
+    const node = (await figma.getNodeByIdAsync(layerId)) as SceneNode | null;
     if (node) {
       layerInfoMap.set(layerId, { id: layerId, name: layerName, order, type: getLayerType(node) });
     }
   };
 
-  allUsages.forEach((u, idx) => tryAdd(u.layerId, u.layer, idx));
-  unboundUsages.forEach((u, idx) => tryAdd(u.layerId, u.layer, allUsages.length + idx));
+  for (let idx = 0; idx < allUsages.length; idx++) {
+    const u = allUsages[idx];
+    await tryAdd(u.layerId, u.layer, idx);
+  }
+  for (let idx = 0; idx < unboundUsages.length; idx++) {
+    const u = unboundUsages[idx];
+    await tryAdd(u.layerId, u.layer, allUsages.length + idx);
+  }
 
   return layerInfoMap;
 }
@@ -65,7 +71,7 @@ function buildLayerInfoMap(
  * @returns Object mapping layer name to its deduplicated usage list.
  */
 function groupUsagesByLayer(allUsages: FullUsageEntry[]): Record<string, FullUsageEntry[]> {
-  const usagesByLayerId: Record<string, FullUsageEntry[]> = {};
+  const byLayerId: Record<string, FullUsageEntry[]> = {};
   logger.log(`Grouping ${allUsages.length} usages by layer`);
 
   const processedLayerProperties = new Map<string, Set<string>>();
@@ -76,28 +82,28 @@ function groupUsagesByLayer(allUsages: FullUsageEntry[]): Record<string, FullUsa
   });
 
   for (const usage of sortedUsages) {
-    if (!usagesByLayerId[usage.layer]) {
-      usagesByLayerId[usage.layer] = [];
-      processedLayerProperties.set(usage.layer, new Set<string>());
+    if (!byLayerId[usage.layerId]) {
+      byLayerId[usage.layerId] = [];
+      processedLayerProperties.set(usage.layerId, new Set<string>());
     }
 
-    const seen = processedLayerProperties.get(usage.layer)!;
+    const seen = processedLayerProperties.get(usage.layerId)!;
     const propertyKey = `${usage.property}_${usage.id ?? ''}`;
     const isSpacing = SPACING_PROPERTY_KEYS.some(key => usage.property.includes(key));
 
     logger.log(`Layer: ${usage.layer}, Property: ${usage.property}, isSpacing: ${isSpacing}, isDuplicate: ${seen.has(propertyKey)}`);
 
     if (!seen.has(propertyKey) || isSpacing) {
-      usagesByLayerId[usage.layer].push(usage);
+      byLayerId[usage.layerId].push(usage);
       seen.add(propertyKey);
     }
   }
 
-  for (const [layerId, usages] of Object.entries(usagesByLayerId)) {
+  for (const [layerId, usages] of Object.entries(byLayerId)) {
     logger.log(`Layer ${layerId}: ${usages.length} usages after grouping`);
   }
 
-  return usagesByLayerId;
+  return byLayerId;
 }
 
 /**
@@ -105,6 +111,16 @@ function groupUsagesByLayer(allUsages: FullUsageEntry[]): Record<string, FullUsa
  * Resets deduplication state before each run.
  */
 async function updateInspector(): Promise<void> {
+  try {
+    await runInspector();
+  } catch (err) {
+    logger.error('updateInspector error', err);
+    const errorMsg: PluginToUIMessage = { type: 'error', message: String(err) };
+    figma.ui.postMessage(errorMsg);
+  }
+}
+
+async function runInspector(): Promise<void> {
   resetDedupSets();
 
   const vars = await loadVariables();
@@ -129,7 +145,7 @@ async function updateInspector(): Promise<void> {
     getUnboundEffectUsages(node, unboundUsages);
   }
 
-  const layerInfoMap = buildLayerInfoMap(allUsages, unboundUsages);
+  const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages);
   const byLayer = groupUsagesByLayer(allUsages);
 
   logger.log('Final usages count:', allUsages.length);
@@ -137,12 +153,14 @@ async function updateInspector(): Promise<void> {
   logger.log('Unbound usages count:', unboundUsages.length);
   logger.log('Total nodes in layerInfoMap:', layerInfoMap.size);
 
-  figma.ui.postMessage({
+  const msg: PluginToUIMessage = {
+    type: 'render',
     byLayer,
     unbound: unboundUsages,
     layerInfoMap: Object.fromEntries(layerInfoMap),
     noVariablesFound: allUsages.length === 0 && unboundUsages.length === 0,
-  });
+  };
+  figma.ui.postMessage(msg);
 }
 
 /**
@@ -156,11 +174,11 @@ function initializePlugin(): void {
     title: 'Variable Inspector',
   });
 
-  figma.ui.onmessage = (msg: { type: string; width?: number; height?: number; nodeId?: string }) => {
-    if (msg.type === 'resize' && msg.width && msg.height) {
+  figma.ui.onmessage = async (msg: UIToPluginMessage) => {
+    if (msg.type === 'resize') {
       figma.ui.resize(msg.width, msg.height);
-    } else if (msg.type === 'select-node' && msg.nodeId) {
-      const node = figma.getNodeById(msg.nodeId) as SceneNode | null;
+    } else if (msg.type === 'select-node') {
+      const node = (await figma.getNodeByIdAsync(msg.nodeId)) as SceneNode | null;
       if (node) {
         figma.currentPage.selection = [node];
         figma.viewport.scrollAndZoomIntoView([node]);
@@ -168,11 +186,9 @@ function initializePlugin(): void {
     }
   };
 
-  figma.on('selectionchange', () => {
-    updateInspector().catch(err => logger.error('updateInspector error', err));
-  });
+  figma.on('selectionchange', () => { updateInspector(); });
 
-  updateInspector().catch(err => logger.error('updateInspector error', err));
+  updateInspector();
 }
 
 initializePlugin();

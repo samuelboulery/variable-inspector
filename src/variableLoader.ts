@@ -49,7 +49,7 @@ export async function loadVariables(): Promise<Map<string, VariableDefinition>> 
  * @param variableMap - Map to populate in place.
  */
 async function loadLocalVariables(variableMap: Map<string, VariableDefinition>): Promise<void> {
-  const collections = figma.variables.getLocalVariableCollections();
+  const collections = await figma.variables.getLocalVariableCollectionsAsync();
   for (const col of collections) {
     for (const id of col.variableIds) {
       const variable = await figma.variables.getVariableByIdAsync(id);

@@ -1042,15 +1042,14 @@
       }
 
       // Sort mode dispatch :
-      //  - 'unbound'    : filtre bound out, layout flat par property (uniquement unbound)
+      //  - 'unbound'    : layout byLayer mais sans les bound (byLayer = {})
       //  - 'byProperty' : layout flat par property (bound + unbound mélangés)
       //  - 'byLayer'    : flow historique ci-dessous (bound + unbound par calque)
       const mode = getSortMode();
       if (mode === 'unbound') {
-        renderByPropertyMode(container, { ...msg, byLayer: {} }, unboundMap);
-        return;
-      }
-      if (mode === 'byProperty') {
+        byLayer = {};
+        // fall through to byLayer rendering loop; unboundMap drives layer-sections
+      } else if (mode === 'byProperty') {
         renderByPropertyMode(container, { ...msg, byLayer }, unboundMap);
         return;
       }

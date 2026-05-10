@@ -238,6 +238,7 @@ function initializePlugin(): void {
     width: 300,
     height: 400,
     title: 'Variable Inspector',
+    themeColors: true,
   });
 
   figma.ui.onmessage = async (msg: UIToPluginMessage) => {

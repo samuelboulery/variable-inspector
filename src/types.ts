@@ -112,3 +112,6 @@ export interface ResizeMessage {
 
 /** Union of all messages the UI thread can send to the plugin thread. */
 export type UIToPluginMessage = SelectNodeMessage | ResizeMessage;
+
+/** Sort modes for the UI's main rendering. */
+export type SortMode = 'byLayer' | 'byProperty';

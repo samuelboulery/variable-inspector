@@ -337,4 +337,156 @@ describe('getUnboundEffectUsages', () => {
     getUnboundEffectUsages(node, usages);
     expect(usages).toHaveLength(0);
   });
+
+  it('reports unbound shadow spread', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [{ type: 'DROP_SHADOW', radius: 0, spread: 6 }],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const spread = usages.find(u => u.property === 'Drop Shadow Spread');
+    expect(spread).toBeDefined();
+    expect(spread!.value).toBe('6');
+  });
+
+  it('skips offset.x when bound but reports offset.y when unbound', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [{
+        type: 'DROP_SHADOW',
+        radius: 0,
+        offset: { x: 2, y: 4 },
+        boundVariables: { offset: { x: { id: 'var-x' } } },
+      }],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const props = usages.map(u => u.property);
+    expect(props).not.toContain('Drop Shadow Offset X');
+    expect(props).toContain('Drop Shadow Offset Y');
+  });
+
+  it('uses "Radius" label (not "Blur") for non-blur, non-shadow effect types', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [{ type: 'NOISE', radius: 3 }],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    expect(usages[0].property).toBe('Noise Radius');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUnboundFloatUsages — text properties: lineHeight, letterSpacing, paragraphSpacing
+// ---------------------------------------------------------------------------
+
+describe('getUnboundFloatUsages — additional text properties', () => {
+  it('reports unbound letterSpacing on a TEXT node', () => {
+    const node = makeTextNode({ id: 't1', name: 'Caption', letterSpacing: 1.5 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    const ls = usages.find(u => u.property.toLowerCase().includes('letter'));
+    expect(ls).toBeDefined();
+    expect(ls!.value).toBe('1.5');
+  });
+
+  it('reports unbound lineHeight on a TEXT node', () => {
+    const node = makeTextNode({ id: 't1', name: 'Body', lineHeight: 24 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    const lh = usages.find(u => u.property.toLowerCase().includes('line'));
+    expect(lh).toBeDefined();
+    expect(lh!.value).toBe('24');
+  });
+
+  it('reports unbound paragraphSpacing on a TEXT node', () => {
+    const node = makeTextNode({ id: 't1', name: 'Body', paragraphSpacing: 8 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    const ps = usages.find(u => u.property.toLowerCase().includes('paragraph'));
+    expect(ps).toBeDefined();
+    expect(ps!.value).toBe('8');
+  });
+
+  it('skips text properties bound to variables', () => {
+    const node = makeTextNode({
+      id: 't1',
+      letterSpacing: 1,
+      boundVariables: { letterSpacing: { id: 'var-ls' } },
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property.toLowerCase().includes('letter'))).toBeUndefined();
+  });
+
+  it('skips zero-valued text properties', () => {
+    const node = makeTextNode({ id: 't1', letterSpacing: 0, paragraphSpacing: 0 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property.toLowerCase().includes('letter'))).toBeUndefined();
+    expect(usages.find(u => u.property.toLowerCase().includes('paragraph'))).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUnboundFloatUsages — spacing (padding, gap)
+// ---------------------------------------------------------------------------
+
+describe('getUnboundFloatUsages — spacing', () => {
+  function makeAutoLayoutFrame(overrides: {
+    paddingLeft?: number;
+    paddingRight?: number;
+    paddingTop?: number;
+    paddingBottom?: number;
+    itemSpacing?: number;
+    boundVariables?: Record<string, unknown>;
+  } = {}): SceneNode {
+    return {
+      id: 'al-1',
+      name: 'AutoFrame',
+      type: 'FRAME',
+      paddingLeft: overrides.paddingLeft ?? 0,
+      paddingRight: overrides.paddingRight ?? 0,
+      paddingTop: overrides.paddingTop ?? 0,
+      paddingBottom: overrides.paddingBottom ?? 0,
+      itemSpacing: overrides.itemSpacing ?? 0,
+      boundVariables: overrides.boundVariables ?? {},
+    } as unknown as SceneNode;
+  }
+
+  it('reports unbound padding on each side', () => {
+    const node = makeAutoLayoutFrame({ paddingLeft: 12, paddingRight: 16, paddingTop: 4, paddingBottom: 8 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    const props = usages.map(u => u.property);
+    expect(props).toContain('Padding Left');
+    expect(props).toContain('Padding Right');
+    expect(props).toContain('Padding Top');
+    expect(props).toContain('Padding Bottom');
+  });
+
+  it('reports unbound itemSpacing as Gap', () => {
+    const node = makeAutoLayoutFrame({ itemSpacing: 10 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    const gap = usages.find(u => u.property.toLowerCase().includes('gap') || u.property.toLowerCase().includes('item'));
+    expect(gap).toBeDefined();
+    expect(gap!.value).toBe('10');
+  });
+
+  it('skips spacing when value is 0', () => {
+    const node = makeAutoLayoutFrame({ paddingLeft: 0, itemSpacing: 0 });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages).toHaveLength(0);
+  });
+
+  it('skips paddingLeft when bound to a variable', () => {
+    const node = makeAutoLayoutFrame({ paddingLeft: 12, boundVariables: { paddingLeft: { id: 'var-pl' } } });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property === 'Padding Left')).toBeUndefined();
+  });
 });

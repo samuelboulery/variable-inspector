@@ -1,14 +1,22 @@
 import { createVariableTypeIcon, createPropertyIcon, createLayerTypeIcon } from './ui.js';
 
+let openPathPill = null; // singleton open pill for auto-close
+
 /**
  * Creates a variable pill element displaying the variable's type icon and name.
+ * If the item has a path, clicking the pill toggles a breadcrumb expansion.
+ * Only one pill can be expanded at a time (single-open semantics).
  *
- * @param {object} item - A FullUsageEntry with origin, type, and name fields.
- * @returns {HTMLElement} The pill span element.
+ * @param {object} item - A FullUsageEntry with origin, type, name, and optional path fields.
+ * @returns {HTMLElement} The pill wrapper div element.
  */
 export function createVariablePill(item) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'pill-wrapper';
+
   const pill = document.createElement('span');
   pill.className = `variable-pill ${item.origin}-variable`;
+  pill.style.cursor = item.path ? 'pointer' : 'default';
 
   const typeIcon = createVariableTypeIcon(item.type);
   if (typeIcon) {
@@ -19,7 +27,54 @@ export function createVariablePill(item) {
   nameSpan.textContent = item.name;
   pill.appendChild(nameSpan);
 
-  return pill;
+  wrapper.appendChild(pill);
+
+  if (item.path) {
+    const pathBox = document.createElement('div');
+    pathBox.className = 'variable-path';
+    pathBox.style.display = 'none';
+    pathBox.appendChild(buildPathBreadcrumb(item.path));
+    wrapper.appendChild(pathBox);
+
+    pill.addEventListener('click', () => {
+      const isOpen = pathBox.style.display === 'block';
+      if (openPathPill && openPathPill !== pathBox) {
+        openPathPill.style.display = 'none';
+      }
+      pathBox.style.display = isOpen ? 'none' : 'block';
+      openPathPill = isOpen ? null : pathBox;
+    });
+  }
+
+  return wrapper;
+}
+
+/**
+ * Builds a breadcrumb display for a variable path.
+ *
+ * @param {object} path - The variable path with library, collection, groups, name, and isAlias fields.
+ * @returns {HTMLElement} The breadcrumb content div.
+ */
+function buildPathBreadcrumb(path) {
+  const root = document.createElement('div');
+  root.className = 'path-content';
+  const parts = [];
+  if (path.library) {
+    parts.push(path.library);
+  }
+  parts.push(path.collection);
+  for (const g of path.groups) {
+    parts.push(g);
+  }
+  parts.push(path.name);
+  root.textContent = '└─ ' + parts.join(' / ');
+  if (path.isAlias) {
+    const aliasTag = document.createElement('span');
+    aliasTag.className = 'alias-tag';
+    aliasTag.textContent = ' (alias)';
+    root.appendChild(aliasTag);
+  }
+  return root;
 }
 
 /**

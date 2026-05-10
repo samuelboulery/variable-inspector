@@ -574,7 +574,7 @@
 
           // Titre du calque
           const title = document.createElement("h2");
-          title.textContent = layerName;
+          title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
           // Icône de sélection (SVG simple, remplace facilement)

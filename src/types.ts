@@ -53,3 +53,41 @@ export interface LayerInfo {
   /** Figma node type string (e.g. "FRAME", "AUTO_HORIZONTAL", "COMPONENT"). */
   type: string;
 }
+
+// ---------------------------------------------------------------------------
+// Plugin thread ↔ UI thread message types
+// ---------------------------------------------------------------------------
+
+/** Sent by the plugin thread when a scan result is ready to render. */
+export interface RenderMessage {
+  type: 'render';
+  byLayer: Record<string, FullUsageEntry[]>;
+  unbound: UnboundUsage[];
+  layerInfoMap: Record<string, LayerInfo>;
+  noVariablesFound: boolean;
+}
+
+/** Sent by the plugin thread when an unrecoverable error occurs. */
+export interface ErrorMessage {
+  type: 'error';
+  message: string;
+}
+
+/** Union of all messages the plugin thread can send to the UI. */
+export type PluginToUIMessage = RenderMessage | ErrorMessage;
+
+/** Sent by the UI thread to select and focus a node in the canvas. */
+export interface SelectNodeMessage {
+  type: 'select-node';
+  nodeId: string;
+}
+
+/** Sent by the UI thread to resize the plugin panel. */
+export interface ResizeMessage {
+  type: 'resize';
+  width: number;
+  height: number;
+}
+
+/** Union of all messages the UI thread can send to the plugin thread. */
+export type UIToPluginMessage = SelectNodeMessage | ResizeMessage;

@@ -4,7 +4,7 @@ import { UnboundUsage } from './types';
 import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
 import { trackProperty } from './dedup';
 import { processedFontSizeNodeIds } from './dedup';
-import { formatEffectType } from './nodeScanner';
+import { formatEffectType, getLayerDisplayName } from './nodeScanner';
 import { logger } from './utils/logger';
 
 /** Formats a number to at most 2 decimal places, removing trailing zeros. */
@@ -46,7 +46,7 @@ export function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsa
       const p = fill as PaintWithBindings;
       if (!p.boundVariables?.color?.id && p.color) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: PROPERTY_NAMES.FILL,
           value: rgbString(p.color),
@@ -66,7 +66,7 @@ export function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsa
     }
     if (firstUnbound && !trackProperty(node.id, PROPERTY_NAMES.STROKE)) {
       unboundUsages.push({
-        layer: node.name,
+        layer: getLayerDisplayName(node),
         layerId: node.id,
         property: PROPERTY_NAMES.STROKE,
         value: rgbString(firstUnbound),
@@ -88,7 +88,7 @@ function getUnboundOpacityUsage(node: NodeWithBindings, unboundUsages: UnboundUs
   if (node.boundVariables?.opacity?.id) return;
   if (!trackProperty(node.id, PROPERTY_NAMES.OPACITY)) {
     unboundUsages.push({
-      layer: node.name,
+      layer: getLayerDisplayName(node),
       layerId: node.id,
       property: PROPERTY_NAMES.OPACITY,
       value: fmt(opacity),
@@ -118,7 +118,7 @@ function getUnboundStrokeWeightUsages(node: NodeWithBindings, unboundUsages: Unb
   if (typeof sw === 'number' && sw !== 0 && !node.boundVariables?.strokeWeight?.id && !hasAsymmetric) {
     if (!trackProperty(node.id, PROPERTY_NAMES.STROKE_WEIGHT)) {
       unboundUsages.push({
-        layer: node.name,
+        layer: getLayerDisplayName(node),
         layerId: node.id,
         property: PROPERTY_NAMES.STROKE_WEIGHT,
         value: fmt(sw),
@@ -133,7 +133,7 @@ function getUnboundStrokeWeightUsages(node: NodeWithBindings, unboundUsages: Unb
     if (node.boundVariables?.[prop]?.id) continue;
     const displayName = PROPERTY_MAPPING[prop] ?? prop;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: node.name, layerId: node.id, property: displayName, value: fmt(weight) });
+      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(weight) });
     }
   }
 }
@@ -157,7 +157,7 @@ function getUnboundCornerRadiusUsages(node: NodeWithBindings, unboundUsages: Unb
     ) {
       if (!trackProperty(node.id, PROPERTY_NAMES.CORNER_RADIUS)) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: PROPERTY_NAMES.CORNER_RADIUS,
           value: fmt(cr),
@@ -173,7 +173,7 @@ function getUnboundCornerRadiusUsages(node: NodeWithBindings, unboundUsages: Unb
     if (node.boundVariables?.[prop]?.id) continue;
     const displayName = PROPERTY_MAPPING[prop] ?? prop;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: node.name, layerId: node.id, property: displayName, value: fmt(radius) });
+      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(radius) });
     }
   }
 }
@@ -199,7 +199,7 @@ function getUnboundTextPropertyUsages(node: NodeWithBindings, unboundUsages: Unb
     if (typeof value !== 'number' || value === 0) continue;
     if (node.boundVariables?.[key]?.id) continue;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: node.name, layerId: node.id, property: displayName, value: fmt(value) });
+      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(value) });
     }
   }
 }
@@ -224,7 +224,7 @@ function getUnboundSpacingUsages(node: NodeWithBindings, unboundUsages: UnboundU
     if (node.boundVariables?.[key]?.id) continue;
     logger.log(`Found spacing property ${key} = ${value} on node ${node.name}`);
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: node.name, layerId: node.id, property: displayName, value: fmt(value) });
+      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(value) });
     }
   }
 }
@@ -264,7 +264,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       if (!radiusBound?.id) {
         const label = isBlurOrShadow ? 'Blur' : 'Radius';
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: `${friendlyType} ${label}`,
           value: fmt(effect.radius),
@@ -276,7 +276,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const offsetBound = (boundVars.offset as { x?: { id?: string }; y?: { id?: string } }) ?? {};
       if (typeof effect.offset.x === 'number' && !offsetBound.x?.id) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: `${friendlyType} Offset X`,
           value: fmt(effect.offset.x),
@@ -284,7 +284,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       }
       if (typeof effect.offset.y === 'number' && !offsetBound.y?.id) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: `${friendlyType} Offset Y`,
           value: fmt(effect.offset.y),
@@ -296,7 +296,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const spreadBound = boundVars.spread as { id?: string } | undefined;
       if (!spreadBound?.id) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: `${friendlyType} Spread`,
           value: fmt(effect.spread),
@@ -308,7 +308,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const colorBound = boundVars.color as { id?: string } | undefined;
       if (!colorBound?.id) {
         unboundUsages.push({
-          layer: node.name,
+          layer: getLayerDisplayName(node),
           layerId: node.id,
           property: `${friendlyType} Color`,
           value: rgbString(effect.color),

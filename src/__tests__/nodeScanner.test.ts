@@ -239,6 +239,35 @@ describe('inspectNode', () => {
     expect(usages.find(u => u.property === 'Layer Blur radius')).toBeDefined();
     expect(usages.find(u => u.property === 'Layer Blur 1 radius')).toBeUndefined();
   });
+
+  it('attaches effectGroup + subProp on numbered drop-shadow bindings', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      name: 'Card',
+      effects: [
+        { type: 'DROP_SHADOW', boundVariables: { radius: { id: 'var-r1' } } },
+        { type: 'DROP_SHADOW', boundVariables: { color: { id: 'var-c2' } } },
+      ],
+    });
+    const usages = inspectNode(node);
+    const r1 = usages.find(u => u.property === 'Drop Shadow 1 radius');
+    const c2 = usages.find(u => u.property === 'Drop Shadow 2 color');
+    expect(r1?.effectGroup).toBe('Drop Shadow 1');
+    expect(r1?.subProp).toBe('Blur');
+    expect(c2?.effectGroup).toBe('Drop Shadow 2');
+    expect(c2?.subProp).toBe('Color');
+  });
+
+  it('uses unnumbered effectGroup for single effect of its type', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      name: 'Card',
+      effects: [{ type: 'LAYER_BLUR', boundVariables: { radius: { id: 'var-r' } } }],
+    });
+    const r = inspectNode(node).find(u => u.property === 'Layer Blur radius');
+    expect(r?.effectGroup).toBe('Layer Blur');
+    expect(r?.subProp).toBe('Blur');
+  });
 });
 
 // ---------------------------------------------------------------------------

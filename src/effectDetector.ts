@@ -49,19 +49,22 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
     seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
     const idx = seenIdx[effect.type];
     const baseLabel = formatEffectType(effect.type);
-    const friendlyType = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
+    const effectGroup = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
     const isBlurOrShadow = effect.type.includes('BLUR') || effect.type.includes('SHADOW');
     const boundVars = effect.boundVariables ?? {};
+    const layer = getLayerDisplayName(node);
 
     if (typeof effect.radius === 'number') {
       const radiusBound = boundVars.radius as { id?: string } | undefined;
       if (!radiusBound?.id) {
-        const label = isBlurOrShadow ? 'Blur' : 'Radius';
+        const subProp = isBlurOrShadow ? 'Blur' : 'Radius';
         unboundUsages.push({
-          layer: getLayerDisplayName(node),
+          layer,
           layerId: node.id,
-          property: `${friendlyType} ${label}`,
+          property: `${effectGroup} ${subProp}`,
           value: fmt(effect.radius),
+          effectGroup,
+          subProp,
         });
       }
     }
@@ -70,18 +73,22 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const offsetBound = (boundVars.offset as { x?: { id?: string }; y?: { id?: string } }) ?? {};
       if (typeof effect.offset.x === 'number' && !offsetBound.x?.id) {
         unboundUsages.push({
-          layer: getLayerDisplayName(node),
+          layer,
           layerId: node.id,
-          property: `${friendlyType} Offset X`,
+          property: `${effectGroup} Offset X`,
           value: fmt(effect.offset.x),
+          effectGroup,
+          subProp: 'Offset X',
         });
       }
       if (typeof effect.offset.y === 'number' && !offsetBound.y?.id) {
         unboundUsages.push({
-          layer: getLayerDisplayName(node),
+          layer,
           layerId: node.id,
-          property: `${friendlyType} Offset Y`,
+          property: `${effectGroup} Offset Y`,
           value: fmt(effect.offset.y),
+          effectGroup,
+          subProp: 'Offset Y',
         });
       }
     }
@@ -90,10 +97,12 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const spreadBound = boundVars.spread as { id?: string } | undefined;
       if (!spreadBound?.id) {
         unboundUsages.push({
-          layer: getLayerDisplayName(node),
+          layer,
           layerId: node.id,
-          property: `${friendlyType} Spread`,
+          property: `${effectGroup} Spread`,
           value: fmt(effect.spread),
+          effectGroup,
+          subProp: 'Spread',
         });
       }
     }
@@ -102,10 +111,12 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
       const colorBound = boundVars.color as { id?: string } | undefined;
       if (!colorBound?.id) {
         unboundUsages.push({
-          layer: getLayerDisplayName(node),
+          layer,
           layerId: node.id,
-          property: `${friendlyType} Color`,
+          property: `${effectGroup} Color`,
           value: rgbString(effect.color),
+          effectGroup,
+          subProp: 'Color',
         });
       }
     }

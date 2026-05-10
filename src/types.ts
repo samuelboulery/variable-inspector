@@ -32,6 +32,18 @@ export interface VariableUsage {
   property: string;
   /** Figma variable ID. */
   id: string;
+  /**
+   * Effect grouping key when this usage is a sub-property of a Figma effect.
+   * "Drop Shadow" for a single effect of its type, "Drop Shadow 1" / "Drop Shadow 2"
+   * when the same node has multiple effects of the same type. UI uses this to
+   * render all sub-props of one effect under a single sub-section.
+   */
+  effectGroup?: string;
+  /**
+   * Canonical sub-property name within an effect group: "Radius", "Blur",
+   * "Color", "Offset X", "Offset Y", "Spread". Set together with effectGroup.
+   */
+  subProp?: string;
 }
 
 /** A property that is hardcoded — not bound to any variable. */
@@ -44,6 +56,10 @@ export interface UnboundUsage {
   property: string;
   /** Raw formatted value (e.g. "rgb(255, 0, 0)", "16"). */
   value: string;
+  /** See VariableUsage.effectGroup. */
+  effectGroup?: string;
+  /** See VariableUsage.subProp. */
+  subProp?: string;
 }
 
 /** Full usage entry enriched with variable metadata, used for UI rendering. */
@@ -57,6 +73,10 @@ export interface FullUsageEntry {
   colorValue?: RGB | RGBA;
   id: string;
   path?: VariablePath;
+  /** See VariableUsage.effectGroup. */
+  effectGroup?: string;
+  /** See VariableUsage.subProp. */
+  subProp?: string;
 }
 
 /** Metadata about a layer node sent to the UI. */

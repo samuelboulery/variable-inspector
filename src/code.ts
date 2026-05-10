@@ -161,12 +161,13 @@ async function runInspector(): Promise<void> {
     }
 
     const nodeUsages = inspectNode(representative);
-    for (const { layer, property, id } of nodeUsages) {
+    for (const usage of nodeUsages) {
+      const { layer, property, id, effectGroup, subProp } = usage;
       const def = vars.get(id);
       allUsages.push(
         def
-          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id, path: def.path }
-          : { layer, layerId: representative.id, property, name: id, type: 'STRING', origin: 'external', id },
+          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id, path: def.path, effectGroup, subProp }
+          : { layer, layerId: representative.id, property, name: id, type: 'STRING', origin: 'external', id, effectGroup, subProp },
       );
     }
     getUnboundColorUsages(representative, unboundUsages);

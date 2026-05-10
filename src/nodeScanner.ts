@@ -111,6 +111,20 @@ export function formatEffectType(effectType: string): string {
  * @param node - The scene node to inspect.
  * @param usages - Array to append found usages to.
  */
+/**
+ * Maps a raw boundVariables key on an Effect to the canonical sub-property
+ * name surfaced in the UI's effect group section.
+ */
+function canonicalEffectSubProp(prop: string, effectType: string): string {
+  if (prop === 'radius') {
+    return effectType.includes('BLUR') || effectType.includes('SHADOW') ? 'Blur' : 'Radius';
+  }
+  if (prop === 'color') return 'Color';
+  if (prop === 'spread') return 'Spread';
+  if (prop === 'offset') return 'Offset';
+  return prop.charAt(0).toUpperCase() + prop.slice(1);
+}
+
 function getEffectUsages(node: SceneNode, usages: VariableUsage[]): void {
   if (!('effects' in node) || !Array.isArray(node.effects)) return;
   const effects = node.effects as EffectWithBindings[];
@@ -124,13 +138,16 @@ function getEffectUsages(node: SceneNode, usages: VariableUsage[]): void {
     seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
     const idx = seenIdx[effect.type];
     const baseLabel = formatEffectType(effect.type);
-    const friendlyType = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
+    const effectGroup = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
     for (const [prop, bind] of Object.entries(effect.boundVariables)) {
       if ((bind as { id?: string }).id) {
+        const subProp = canonicalEffectSubProp(prop, effect.type);
         usages.push({
           layer: getLayerDisplayName(node),
-          property: `${friendlyType} ${prop}`,
+          property: `${effectGroup} ${prop}`,
           id: (bind as { id: string }).id,
+          effectGroup,
+          subProp,
         });
       }
     }

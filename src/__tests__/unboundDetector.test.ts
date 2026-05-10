@@ -427,6 +427,40 @@ describe('getUnboundEffectUsages — numbering repeated effects', () => {
     expect(props).toContain('Drop Shadow 2 Blur');
     expect(props).toContain('Inner Shadow Blur');
   });
+
+  it('attaches effectGroup + subProp on numbered drop-shadow blur', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [
+        { type: 'DROP_SHADOW', radius: 4 },
+        { type: 'DROP_SHADOW', radius: 8 },
+      ],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const u1 = usages.find(u => u.property === 'Drop Shadow 1 Blur');
+    expect(u1?.effectGroup).toBe('Drop Shadow 1');
+    expect(u1?.subProp).toBe('Blur');
+  });
+
+  it('attaches unnumbered effectGroup for single effect of its type', () => {
+    const node = makeRectNode({
+      id: 'n1',
+      effects: [{
+        type: 'DROP_SHADOW',
+        radius: 4,
+        offset: { x: 2, y: 4 },
+        spread: 1,
+        color: { r: 0, g: 0, b: 0 },
+      }],
+    });
+    const usages: UnboundUsage[] = [];
+    getUnboundEffectUsages(node, usages);
+    const groups = new Set(usages.filter(u => u.effectGroup).map(u => u.effectGroup));
+    expect(groups).toEqual(new Set(['Drop Shadow']));
+    const subProps = new Set(usages.filter(u => u.subProp).map(u => u.subProp));
+    expect(subProps).toEqual(new Set(['Blur', 'Offset X', 'Offset Y', 'Spread', 'Color']));
+  });
 });
 
 // ---------------------------------------------------------------------------

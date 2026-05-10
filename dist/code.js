@@ -754,6 +754,25 @@ const q=`<!DOCTYPE html>
           title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
+          // Badge × N pour les instances mergées (cycle entre les nodes au clic)
+          if (layerInfo && layerInfo.count && layerInfo.count > 1) {
+            const badge = document.createElement('span');
+            badge.className = 'merge-badge';
+            badge.textContent = \`× \${layerInfo.count}\`;
+            badge.title = 'Cliquer pour cycler entre les instances fusionnées';
+            badge.dataset.cycleIndex = '0';
+            badge.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              const ids = layerInfo.mergedNodeIds || [];
+              if (ids.length === 0) return;
+              let idx = parseInt(badge.dataset.cycleIndex, 10) || 0;
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: ids[idx] } }, '*');
+              idx = (idx + 1) % ids.length;
+              badge.dataset.cycleIndex = String(idx);
+            });
+            hcontent.appendChild(badge);
+          }
+
           // Icône de sélection (SVG simple, remplace facilement)
           const selectIcon = document.createElement("span");
           selectIcon.className = "select-icon";

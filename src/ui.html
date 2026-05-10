@@ -622,6 +622,22 @@
       return ul;
     }
 
+    // Construit la toolbar (rescan + futures controls). Posted-back rescan
+    // message déclenche un nouveau scan plugin-side.
+    function renderToolbar() {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'toolbar';
+      toolbar.innerHTML = `
+        <div class="toolbar-row">
+          <button class="rescan-btn" title="Re-scan selection">⟳</button>
+        </div>
+      `;
+      toolbar.querySelector('.rescan-btn').addEventListener('click', () => {
+        parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
+      });
+      return toolbar;
+    }
+
     // Construit le dashboard de stats affiché au-dessus des layer-sections
     function renderStats(stats) {
       const dashboard = document.createElement('div');
@@ -646,6 +662,22 @@
     // --- window.onmessage handler moved below all definitions ---
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      // Scan-start : ajoute la classe .scanning au bouton rescan pour
+      // afficher le spinner. Ne touche pas au reste du DOM — le contenu
+      // précédent reste affiché pendant le scan.
+      if (msg.type === 'scan-start') {
+        document.querySelectorAll('.rescan-btn').forEach(b => b.classList.add('scanning'));
+        return;
+      }
+
+      if (msg.type === 'error') {
+        const container = document.getElementById("app");
+        container.innerHTML = `<div style="padding:1rem;color:#b00;">Erreur: ${msg.message || 'inconnue'}</div>`;
+        return;
+      }
+
       const { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
       // Dedup unbound entries within each layer name by
       // (effectGroup, subProp, property, value) tuple. Multiple identical
@@ -668,6 +700,10 @@
       }
       const container = document.getElementById("app");
       container.innerHTML = "";
+
+      // Toolbar (rescan button + futurs controls) — toujours rendu, même
+      // sur empty state, pour permettre à l'utilisateur de relancer un scan.
+      container.appendChild(renderToolbar());
 
       // Vérifier s'il n'y a aucune variable ni propriété non liée
       if (noVariablesFound) {

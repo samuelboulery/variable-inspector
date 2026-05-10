@@ -348,6 +348,130 @@
     }
 
     // Fonction pour rendre une liste d'éléments (groupés ou simples)
+    /**
+     * Splits an array of items (bound or unbound) into two arrays:
+     * those without an effectGroup (rendered normally) and those with one
+     * (rendered grouped). Mutates nothing; returns { normal, effectItems }.
+     */
+    function splitEffectsFromItems(items) {
+      const normal = [];
+      const effectItems = [];
+      for (const item of items || []) {
+        if (item && item.effectGroup) effectItems.push(item);
+        else normal.push(item);
+      }
+      return { normal, effectItems };
+    }
+
+    /**
+     * Builds a Map<effectGroup, { bound: [], unbound: [] }> grouping each
+     * effect's sub-props together. Insertion order = first appearance.
+     */
+    function groupEffectItems(boundEffects, unboundEffects) {
+      const groups = new Map();
+      const bucket = (key) => {
+        if (!groups.has(key)) groups.set(key, { bound: [], unbound: [] });
+        return groups.get(key);
+      };
+      for (const e of boundEffects) bucket(e.effectGroup).bound.push(e);
+      for (const u of unboundEffects) bucket(u.effectGroup).unbound.push(u);
+      return groups;
+    }
+
+    /**
+     * Sort sub-props in a logical order: Radius/Blur first, then Offset X/Y,
+     * then Spread, then Color. Anything else falls to the bottom alphabetically.
+     */
+    const SUBPROP_ORDER = ['Blur', 'Radius', 'Offset X', 'Offset Y', 'Spread', 'Color'];
+    function sortSubProps(items) {
+      return [...items].sort((a, b) => {
+        const ai = SUBPROP_ORDER.indexOf(a.subProp);
+        const bi = SUBPROP_ORDER.indexOf(b.subProp);
+        const ax = ai === -1 ? SUBPROP_ORDER.length : ai;
+        const bx = bi === -1 ? SUBPROP_ORDER.length : bi;
+        if (ax !== bx) return ax - bx;
+        return (a.subProp || '').localeCompare(b.subProp || '');
+      });
+    }
+
+    /**
+     * Returns the base type name from an effectGroup label.
+     * "Drop Shadow 1" → "Drop Shadow", "Drop Shadow" → "Drop Shadow".
+     * Used to look up the matching property icon (Drop Shadow / Inner Shadow / etc.).
+     */
+    function effectGroupBaseType(label) {
+      return label.replace(/ \d+$/, '');
+    }
+
+    /**
+     * Renders one effect group as a property-group block matching the
+     * existing UI for grouped properties (property-group-title header +
+     * property-sub-list with property-container per sub-prop). Reuses the
+     * same DOM structure and classes as renderItemsList(isGroup) so the
+     * visual is consistent with the rest of the panel.
+     */
+    function renderEffectGroup(name, bound, unbound) {
+      const li = document.createElement('li');
+
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'property-group-title';
+      const icon = createPropertyIcon(effectGroupBaseType(name));
+      if (icon) groupTitle.appendChild(icon);
+      const titleText = document.createElement('span');
+      titleText.textContent = name;
+      groupTitle.appendChild(titleText);
+      li.appendChild(groupTitle);
+
+      const subList = document.createElement('ul');
+      subList.className = 'property-sub-list';
+
+      const sortedBound = sortSubProps(bound);
+      const sortedUnbound = sortSubProps(unbound);
+
+      for (const b of sortedBound) {
+        subList.appendChild(renderEffectSubPropRow(b.subProp || b.property, createVariablePill(b), false));
+      }
+      for (const u of sortedUnbound) {
+        const unboundPill = document.createElement('span');
+        unboundPill.className = 'variable-pill unbound-variable';
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = u.value;
+        unboundPill.appendChild(valueSpan);
+        subList.appendChild(renderEffectSubPropRow(u.subProp || u.property, unboundPill, true));
+      }
+
+      li.appendChild(subList);
+      return li;
+    }
+
+    function renderEffectSubPropRow(label, valueEl, _danger) {
+      const subLi = document.createElement('li');
+      const propContainer = document.createElement('div');
+      // Match the renderItemsList(isGroup) layout exactly: no .danger on the
+      // container so the row keeps the neutral spacing; the pill itself
+      // (variable-pill unbound-variable) carries the red palette and warning
+      // icon via .unbound-variable::before.
+      propContainer.className = 'property-container';
+      propContainer.appendChild(createPropertyElement(label));
+      propContainer.appendChild(valueEl);
+      subLi.appendChild(propContainer);
+      return subLi;
+    }
+
+    /**
+     * Renders all effect groups for one layer as a single <ul> matching the
+     * outer panel structure. Returns null if nothing to render.
+     */
+    function renderEffectGroupsSection(boundEffects, unboundEffects) {
+      if (boundEffects.length === 0 && unboundEffects.length === 0) return null;
+      const ul = document.createElement('ul');
+      const groups = groupEffectItems(boundEffects, unboundEffects);
+      for (const [groupName, { bound, unbound }] of groups) {
+        ul.appendChild(renderEffectGroup(groupName, bound, unbound));
+      }
+      return ul;
+    }
+
     function renderItemsList(items, isUnbound = false) {
       const ul = document.createElement("ul");
 
@@ -451,9 +575,9 @@
       const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
       const unboundMap = {};
       if (unbound) {
-        unbound.forEach(({ layer, property, value }) => {
+        unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
           if (!unboundMap[layer]) unboundMap[layer] = [];
-          unboundMap[layer].push({ property, value });
+          unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }
       const container = document.getElementById("app");
@@ -574,7 +698,7 @@
 
           // Titre du calque
           const title = document.createElement("h2");
-          title.textContent = layerName;
+          title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
           // Icône de sélection (SVG simple, remplace facilement)
@@ -596,10 +720,19 @@
 
 
 
-          // Ajouter les propriétés non variabilisées s'il y en a
-          if (unboundItems && unboundItems.length > 0) {
+          // Split effect-grouped items from regular items so each effect
+          // (Drop Shadow 1 / 2 ...) renders as one indented sub-section
+          // mixing bound + unbound sub-props.
+          const boundSplit = splitEffectsFromItems(items);
+          const unboundSplit = splitEffectsFromItems(unboundItems);
+          const normalItems = boundSplit.normal;
+          const normalUnboundItems = unboundSplit.normal;
+          const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
+
+          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          if (normalUnboundItems && normalUnboundItems.length > 0) {
             // Grouper aussi les propriétés non liées
-            const groupedUnboundItems = groupSimilarUnboundProperties(unboundItems);
+            const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
 
             const warn = document.createElement("div");
             warn.className = "danger";
@@ -613,14 +746,21 @@
             section.appendChild(warn);
           }
 
-          // Ajouter les variables liées s'il y en a
-          if (items && items.length > 0) {
+          // Ajouter les variables liées s'il y en a (hors effets)
+          if (normalItems && normalItems.length > 0) {
             // Grouper les propriétés similaires
-            const groupedItems = groupSimilarProperties(items);
+            const groupedItems = groupSimilarProperties(normalItems);
 
             // Utiliser la fonction renderItemsList pour les éléments liés
             const ul = renderItemsList(groupedItems, false);
             section.appendChild(ul);
+          }
+
+          // Effect groups: each Drop Shadow N (or Inner Shadow / Layer Blur)
+          // renders as its own indented sub-section combining bound pills and
+          // unbound danger rows for its sub-props.
+          if (effectGroupsBlock) {
+            section.appendChild(effectGroupsBlock);
           }
 
 

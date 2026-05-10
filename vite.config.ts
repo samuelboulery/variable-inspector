@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    target: 'es2018',
     rollupOptions: {
       input: path.resolve(__dirname, 'src/code.ts'),
       output: {

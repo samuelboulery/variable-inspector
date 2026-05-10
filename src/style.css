@@ -279,6 +279,11 @@ li {
   background-position: center;
 }
 
+/* Effect-group sub-prop rows reuse property-container; the .danger modifier
+   shifts the value pill to the unbound red palette. No new layout rules
+   needed — the existing property-sub-list / property-container / pill
+   styles already give the correct size, border, color and icon. */
+
 .alert-icon {
   display: inline-flex;
   width: 16px;
@@ -291,4 +296,251 @@ li {
   width: 100%;
   height: 100%;
   fill: currentColor;
+}
+
+.merge-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1969d2;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.merge-badge:hover {
+  background: #1454ab;
+}
+
+.pill-wrapper {
+  display: inline-block;
+  margin: 0;
+}
+
+.variable-path {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: #f7fafd;
+  border-left: 2px solid #1969d2;
+  font-size: 11px;
+  color: #444;
+  border-radius: 0 4px 4px 0;
+  animation: slide-down 150ms ease-out;
+}
+
+.path-content {
+  font-family: 'Monaco', 'Menlo', monospace;
+  white-space: nowrap;
+}
+
+.alias-tag {
+  color: #b06000;
+  font-style: italic;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  margin: -1rem -1rem 1rem -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  z-index: 10;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sort-toggle {
+  display: inline-flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sort-toggle button {
+  background: #fff;
+  border: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+}
+
+.sort-toggle button:last-child { border-right: none; }
+.sort-toggle button.active { background: #1969d2; color: #fff; }
+
+.property-section {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e6e6e6;
+  padding-bottom: 12px;
+}
+
+.property-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.property-row-layer {
+  color: #1969d2;
+}
+
+.property-row-layer:hover { text-decoration: underline; }
+
+.stats-dashboard {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #f7fafd;
+  border-radius: 6px;
+  border: 1px solid #e0e8f0;
+}
+
+.stats-line {
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 4px;
+}
+
+.stats-bar {
+  position: relative;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.stats-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1969d2, #19a3d2);
+  transition: width 0.3s ease;
+}
+
+.stats-bar-label {
+  position: absolute;
+  top: -16px;
+  right: 0;
+  font-size: 10px;
+  color: #666;
+}
+
+.color-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  margin-right: 4px;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 0 3px, 3px -3px, -3px 0;
+}
+
+.rescan-btn {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #555;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rescan-btn:hover {
+  color: #1969d2;
+  border-color: #1969d2;
+}
+
+.rescan-btn.scanning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.search-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1969d2;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: #666;
+  margin-right: 4px;
+}
+
+.chip {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.15s;
+}
+
+.chip:hover {
+  border-color: #1969d2;
+  color: #1969d2;
+}
+
+.chip.active {
+  background: #1969d2;
+  color: #fff;
+  border-color: #1969d2;
+}
+
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 2rem 1rem;
+  font-size: 14px;
 }

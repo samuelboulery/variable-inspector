@@ -1,4 +1,4 @@
-const V=`<!DOCTYPE html>
+const q=`<!DOCTYPE html>
 <html>
 
 <head>
@@ -348,6 +348,130 @@ const V=`<!DOCTYPE html>
     }
 
     // Fonction pour rendre une liste d'éléments (groupés ou simples)
+    /**
+     * Splits an array of items (bound or unbound) into two arrays:
+     * those without an effectGroup (rendered normally) and those with one
+     * (rendered grouped). Mutates nothing; returns { normal, effectItems }.
+     */
+    function splitEffectsFromItems(items) {
+      const normal = [];
+      const effectItems = [];
+      for (const item of items || []) {
+        if (item && item.effectGroup) effectItems.push(item);
+        else normal.push(item);
+      }
+      return { normal, effectItems };
+    }
+
+    /**
+     * Builds a Map<effectGroup, { bound: [], unbound: [] }> grouping each
+     * effect's sub-props together. Insertion order = first appearance.
+     */
+    function groupEffectItems(boundEffects, unboundEffects) {
+      const groups = new Map();
+      const bucket = (key) => {
+        if (!groups.has(key)) groups.set(key, { bound: [], unbound: [] });
+        return groups.get(key);
+      };
+      for (const e of boundEffects) bucket(e.effectGroup).bound.push(e);
+      for (const u of unboundEffects) bucket(u.effectGroup).unbound.push(u);
+      return groups;
+    }
+
+    /**
+     * Sort sub-props in a logical order: Radius/Blur first, then Offset X/Y,
+     * then Spread, then Color. Anything else falls to the bottom alphabetically.
+     */
+    const SUBPROP_ORDER = ['Blur', 'Radius', 'Offset X', 'Offset Y', 'Spread', 'Color'];
+    function sortSubProps(items) {
+      return [...items].sort((a, b) => {
+        const ai = SUBPROP_ORDER.indexOf(a.subProp);
+        const bi = SUBPROP_ORDER.indexOf(b.subProp);
+        const ax = ai === -1 ? SUBPROP_ORDER.length : ai;
+        const bx = bi === -1 ? SUBPROP_ORDER.length : bi;
+        if (ax !== bx) return ax - bx;
+        return (a.subProp || '').localeCompare(b.subProp || '');
+      });
+    }
+
+    /**
+     * Returns the base type name from an effectGroup label.
+     * "Drop Shadow 1" → "Drop Shadow", "Drop Shadow" → "Drop Shadow".
+     * Used to look up the matching property icon (Drop Shadow / Inner Shadow / etc.).
+     */
+    function effectGroupBaseType(label) {
+      return label.replace(/ \\d+$/, '');
+    }
+
+    /**
+     * Renders one effect group as a property-group block matching the
+     * existing UI for grouped properties (property-group-title header +
+     * property-sub-list with property-container per sub-prop). Reuses the
+     * same DOM structure and classes as renderItemsList(isGroup) so the
+     * visual is consistent with the rest of the panel.
+     */
+    function renderEffectGroup(name, bound, unbound) {
+      const li = document.createElement('li');
+
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'property-group-title';
+      const icon = createPropertyIcon(effectGroupBaseType(name));
+      if (icon) groupTitle.appendChild(icon);
+      const titleText = document.createElement('span');
+      titleText.textContent = name;
+      groupTitle.appendChild(titleText);
+      li.appendChild(groupTitle);
+
+      const subList = document.createElement('ul');
+      subList.className = 'property-sub-list';
+
+      const sortedBound = sortSubProps(bound);
+      const sortedUnbound = sortSubProps(unbound);
+
+      for (const b of sortedBound) {
+        subList.appendChild(renderEffectSubPropRow(b.subProp || b.property, createVariablePill(b), false));
+      }
+      for (const u of sortedUnbound) {
+        const unboundPill = document.createElement('span');
+        unboundPill.className = 'variable-pill unbound-variable';
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = u.value;
+        unboundPill.appendChild(valueSpan);
+        subList.appendChild(renderEffectSubPropRow(u.subProp || u.property, unboundPill, true));
+      }
+
+      li.appendChild(subList);
+      return li;
+    }
+
+    function renderEffectSubPropRow(label, valueEl, _danger) {
+      const subLi = document.createElement('li');
+      const propContainer = document.createElement('div');
+      // Match the renderItemsList(isGroup) layout exactly: no .danger on the
+      // container so the row keeps the neutral spacing; the pill itself
+      // (variable-pill unbound-variable) carries the red palette and warning
+      // icon via .unbound-variable::before.
+      propContainer.className = 'property-container';
+      propContainer.appendChild(createPropertyElement(label));
+      propContainer.appendChild(valueEl);
+      subLi.appendChild(propContainer);
+      return subLi;
+    }
+
+    /**
+     * Renders all effect groups for one layer as a single <ul> matching the
+     * outer panel structure. Returns null if nothing to render.
+     */
+    function renderEffectGroupsSection(boundEffects, unboundEffects) {
+      if (boundEffects.length === 0 && unboundEffects.length === 0) return null;
+      const ul = document.createElement('ul');
+      const groups = groupEffectItems(boundEffects, unboundEffects);
+      for (const [groupName, { bound, unbound }] of groups) {
+        ul.appendChild(renderEffectGroup(groupName, bound, unbound));
+      }
+      return ul;
+    }
+
     function renderItemsList(items, isUnbound = false) {
       const ul = document.createElement("ul");
 
@@ -451,9 +575,9 @@ const V=`<!DOCTYPE html>
       const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
       const unboundMap = {};
       if (unbound) {
-        unbound.forEach(({ layer, property, value }) => {
+        unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
           if (!unboundMap[layer]) unboundMap[layer] = [];
-          unboundMap[layer].push({ property, value });
+          unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }
       const container = document.getElementById("app");
@@ -574,7 +698,7 @@ const V=`<!DOCTYPE html>
 
           // Titre du calque
           const title = document.createElement("h2");
-          title.textContent = layerName;
+          title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
           // Icône de sélection (SVG simple, remplace facilement)
@@ -596,10 +720,19 @@ const V=`<!DOCTYPE html>
 
 
 
-          // Ajouter les propriétés non variabilisées s'il y en a
-          if (unboundItems && unboundItems.length > 0) {
+          // Split effect-grouped items from regular items so each effect
+          // (Drop Shadow 1 / 2 ...) renders as one indented sub-section
+          // mixing bound + unbound sub-props.
+          const boundSplit = splitEffectsFromItems(items);
+          const unboundSplit = splitEffectsFromItems(unboundItems);
+          const normalItems = boundSplit.normal;
+          const normalUnboundItems = unboundSplit.normal;
+          const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
+
+          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          if (normalUnboundItems && normalUnboundItems.length > 0) {
             // Grouper aussi les propriétés non liées
-            const groupedUnboundItems = groupSimilarUnboundProperties(unboundItems);
+            const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
 
             const warn = document.createElement("div");
             warn.className = "danger";
@@ -613,14 +746,21 @@ const V=`<!DOCTYPE html>
             section.appendChild(warn);
           }
 
-          // Ajouter les variables liées s'il y en a
-          if (items && items.length > 0) {
+          // Ajouter les variables liées s'il y en a (hors effets)
+          if (normalItems && normalItems.length > 0) {
             // Grouper les propriétés similaires
-            const groupedItems = groupSimilarProperties(items);
+            const groupedItems = groupSimilarProperties(normalItems);
 
             // Utiliser la fonction renderItemsList pour les éléments liés
             const ul = renderItemsList(groupedItems, false);
             section.appendChild(ul);
+          }
+
+          // Effect groups: each Drop Shadow N (or Inner Shadow / Layer Blur)
+          // renders as its own indented sub-section combining bound pills and
+          // unbound danger rows for its sub-props.
+          if (effectGroupsBlock) {
+            section.appendChild(effectGroupsBlock);
           }
 
 
@@ -632,7 +772,7 @@ const V=`<!DOCTYPE html>
   <\/script>
 </body>
 
-</html>`,w=`body {
+</html>`,Y=`body {
   font-family: Inter, sans-serif;
   margin: 0;
   padding: 1rem;
@@ -913,6 +1053,11 @@ li {
   background-position: center;
 }
 
+/* Effect-group sub-prop rows reuse property-container; the .danger modifier
+   shifts the value pill to the unbound red palette. No new layout rules
+   needed — the existing property-sub-list / property-container / pill
+   styles already give the correct size, border, color and icon. */
+
 .alert-icon {
   display: inline-flex;
   width: 16px;
@@ -925,4 +1070,251 @@ li {
   width: 100%;
   height: 100%;
   fill: currentColor;
-}`,d={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap"},L={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap"},y={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height"},v=new Set,m=new Set;function Z(e,i,t){return t?`${e}|${i}|${t}`:`${e}|${i}`}function I(){v.clear(),m.clear()}function h(e,i,t){const s=Z(e,i,t);return console.log(`Checking property: ${s}, propertyName: ${i}, exists: ${m.has(s)}`),["paddingLeft","paddingRight","paddingTop","paddingBottom","itemSpacing","gap"].some(C=>i.includes(C))?(console.log(`Skipping deduplication for spacing property: ${i}`),m.add(s),!1):m.has(s)?!0:(m.add(s),!1)}async function N(){const e=new Map,i=figma.variables.getLocalVariableCollections();for(const C of i)for(const n of C.variableIds){const l=await figma.variables.getVariableByIdAsync(n);if(!l)continue;let o;if(l.resolvedType==="COLOR"){const a=Object.keys(l.valuesByMode);if(a.length>0){const p=l.valuesByMode[a[0]];typeof p=="object"&&("r"in p||"g"in p||"b"in p)&&(o=p)}}e.set(n,{name:l.name,type:l.resolvedType,origin:"local",colorValue:o})}const t=figma.currentPage.selection,s=H(t),r=new Set;for(const C of s){const n=b(C);for(const{id:l}of n)e.has(l)||r.add(l)}for(const C of r)try{const n=await figma.variables.getVariableByIdAsync(C);if(!n)continue;let l;if(n.resolvedType==="COLOR"){const o=Object.keys(n.valuesByMode);if(o.length>0){const a=n.valuesByMode[o[0]];typeof a=="object"&&("r"in a||"g"in a||"b"in a)&&(l=a)}}if(e.set(C,{name:n.name,type:n.resolvedType,origin:"external",colorValue:l}),typeof figma.variables.importVariableByKeyAsync=="function"){const o=await figma.variables.importVariableByKeyAsync(n.key);if(o){let a;if(o.resolvedType==="COLOR"){const p=Object.keys(o.valuesByMode);if(p.length>0){const c=o.valuesByMode[p[0]];typeof c=="object"&&("r"in c||"g"in c||"b"in c)&&(a=c)}}e.set(C,{name:o.name,type:o.resolvedType,origin:"external",colorValue:a})}}}catch(n){console.warn(`Impossible de récupérer la variable ${C}:`,n)}return console.log("loadVariables: found",e.size,"variables"),e}function T(e,i){const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills),"backgrounds"in e&&Array.isArray(e.backgrounds)&&t.push(...e.backgrounds);const s=new Set,r=new Set;for(const C of t){const n=C,l=n.boundVariables&&n.boundVariables.color;l&&l.id&&!s.has(l.id)&&(r.add(l.id),s.add(l.id))}if(r.size>0){const C=Array.from(r)[0];i.push({layer:e.name,property:L.FILL,id:C}),r.size>1&&console.log(`${e.name} a ${r.size} variables de remplissage, seule la première est affichée`)}}function x(e,i){if("strokes"in e&&Array.isArray(e.strokes))for(const t of e.strokes){const s=t,r=s.boundVariables&&s.boundVariables.color;r&&r.id&&i.push({layer:e.name,property:d.STROKE_COLOR,id:r.id})}}function S(e,i){if("effects"in e&&Array.isArray(e.effects)){for(const t of e.effects)if(t.boundVariables)for(const[s,r]of Object.entries(t.boundVariables)){const C=r;if(C.id){const o=`${(t.type||"").toLowerCase().replace(/_/g," ").replace(/\b\w/g,a=>a.toUpperCase())} ${s}`;i.push({layer:e.name,property:o,id:C.id})}}}}function P(e,i){const t=e.boundVariables;if(t){const r=new Set(["color","fills","fills.0"]);for(const[C,n]of Object.entries(t)){if(r.has(C)||C.startsWith("fills."))continue;const l=n;if(l.id){const o=y[C]||C;i.push({layer:e.name,property:o,id:l.id})}}}const s=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const r of s)if(e[r]!==void 0&&t&&t[r]&&t[r].id){const C=y[r]||r;i.push({layer:e.name,property:C,id:t[r].id})}}function R(e,i){const t=e.boundVariables,s={fontSize:d.FONT_SIZE,fontWeight:d.FONT_WEIGHT,fontFamily:d.FONT_FAMILY,letterSpacing:d.LETTER_SPACING,lineHeight:d.LINE_HEIGHT,paragraphSpacing:d.PARAGRAPH_SPACING};if(t){for(const[n,l]of Object.entries(s))t[n]&&t[n].id&&(i.push({layer:e.name,property:l,id:t[n].id}),n==="fontSize"&&v.add(e.id));const r={},C=(n,l=[])=>{if(n&&typeof n=="object"){if(n.id&&typeof n.id=="string"){const o=l.join(".");if(o.startsWith("fills.")||o==="fills")return;r[o]||(r[o]=[]),r[o].push(n.id)}for(const o of Object.keys(n))o==="fills"||l.length>0&&l[0]==="fills"||C(n[o],[...l,o])}};C(t);for(const[n,l]of Object.entries(r)){let o=n;for(const[a,p]of Object.entries(s))if(n.includes(a)){o=p,a==="fontSize"&&v.add(e.id);break}o===n&&(o=y[n]||n);for(const a of l)i.push({layer:e.name,property:o,id:a})}}}function b(e){const i=[];return T(e,i),x(e,i),S(e,i),e.type==="TEXT"&&R(e,i),P(e,i),i}function H(e){const i=[],t=[...e];for(;t.length>0;){const s=t.pop();i.push(s),"children"in s&&Array.isArray(s.children)&&t.push(...s.children)}return i}function f(e){return Number(e.toFixed(2)).toString()}function E(e,i){if("fills"in e&&Array.isArray(e.fills))for(let t=0;t<e.fills.length;t++){const r=e.fills[t],C=r.boundVariables&&r.boundVariables.color;if((!C||!C.id)&&r.color){const n=r.color;i.push({layer:e.name,layerId:e.id,property:L.FILL,value:`rgb(${Math.round(n.r*255)}, ${Math.round(n.g*255)}, ${Math.round(n.b*255)})`})}}if("strokes"in e&&Array.isArray(e.strokes)){let t=!1,s;for(let r=0;r<e.strokes.length&&!t;r++){const n=e.strokes[r],l=n.boundVariables&&n.boundVariables.color;(!l||!l.id)&&n.color&&(t=!0,s=n.color)}t&&s&&(h(e.id,L.STROKE)||i.push({layer:e.name,layerId:e.id,property:L.STROKE,value:`rgb(${Math.round(s.r*255)}, ${Math.round(s.g*255)}, ${Math.round(s.b*255)})`}),e.strokes.length>1&&console.log(`${e.name} a ${e.strokes.length} contours, seul le premier non lié est affiché`))}}function A(e,i){const t=e.boundVariables,s=t&&t.opacity;if("opacity"in e&&typeof e.opacity=="number"&&(!s||!s.id)){const C=e.opacity;C<1&&(h(e.id,d.OPACITY)||i.push({layer:e.name,layerId:e.id,property:d.OPACITY,value:f(C)}))}if("strokeWeight"in e&&"strokes"in e&&Array.isArray(e.strokes)&&e.strokes.length>0){const n=e.strokeWeight,l=t&&t.strokeWeight,o=l&&l.id;typeof n=="number"&&n!==0&&!o&&!("strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e)&&(h(e.id,d.STROKE_WEIGHT)||i.push({layer:e.name,layerId:e.id,property:d.STROKE_WEIGHT,value:f(n)})),["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"].forEach(a=>{if(a in e){const p=e[a],c=t&&t[a],u=c&&c.id;if(typeof p=="number"&&p!==0&&!u){const g=y[a]||a;h(e.id,g)||i.push({layer:e.name,layerId:e.id,property:g,value:f(p)})}}})}if("cornerRadius"in e){const C=e.cornerRadius,n=t&&t.cornerRadius,l=n&&n.id;typeof C=="number"&&C!==0&&!l&&!("topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e)&&(h(e.id,d.CORNER_RADIUS)||i.push({layer:e.name,layerId:e.id,property:d.CORNER_RADIUS,value:f(C)}))}if(["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"].forEach(C=>{if(C in e){const n=e[C],l=t&&t[C],o=l&&l.id;if(typeof n=="number"&&n!==0&&!o){const a=y[C]||C;h(e.id,a)||i.push({layer:e.name,layerId:e.id,property:a,value:f(n)})}}}),e.type==="TEXT"){const C=e,n=[{key:"fontSize",displayName:d.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:d.LETTER_SPACING},{key:"lineHeight",displayName:d.LINE_HEIGHT},{key:"paragraphSpacing",displayName:d.PARAGRAPH_SPACING}];for(const{key:l,displayName:o,skipIfProcessed:a}of n){if(a&&l==="fontSize"&&v.has(C.id))continue;const p=C[l],c=t&&t[l],u=c&&c.id;typeof p=="number"&&p!==0&&!u&&!h(e.id,o)&&i.push({layer:e.name,layerId:e.id,property:o,value:f(p)})}}const r=[{key:"paddingLeft",displayName:d.PADDING_LEFT},{key:"paddingRight",displayName:d.PADDING_RIGHT},{key:"paddingTop",displayName:d.PADDING_TOP},{key:"paddingBottom",displayName:d.PADDING_BOTTOM},{key:"itemSpacing",displayName:d.ITEM_SPACING}];for(const{key:C,displayName:n}of r)if(C in e){const l=e[C],o=t&&t[C],a=o&&o.id;typeof l=="number"&&!a&&(l!==0||!["paddingLeft","paddingRight","paddingTop","paddingBottom","itemSpacing","gap"].includes(C))&&(console.log(`Found spacing property ${C} = ${l} on node ${e.name}`),h(e.id,n)||i.push({layer:e.name,layerId:e.id,property:n,value:f(l)}))}}function O(e,i){if("effects"in e&&Array.isArray(e.effects))for(const t of e.effects){const s=t.boundVariables||{},r=t.type||"",C=r.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase());if(typeof t.radius=="number"&&(!s.radius||!s.radius.id)){const n=r.includes("BLUR")||r.includes("SHADOW")?"Blur":"Radius";i.push({layer:e.name,layerId:e.id,property:`${C} ${n}`,value:f(t.radius)})}if(r.includes("SHADOW")&&t.offset){const n=s.offset||{};typeof t.offset.x=="number"&&(!n.x||!n.x.id)&&i.push({layer:e.name,layerId:e.id,property:`${C} Offset X`,value:f(t.offset.x)}),typeof t.offset.y=="number"&&(!n.y||!n.y.id)&&i.push({layer:e.name,layerId:e.id,property:`${C} Offset Y`,value:f(t.offset.y)})}if(typeof t.spread=="number"&&(!s.spread||!s.spread.id)&&i.push({layer:e.name,layerId:e.id,property:`${C} Spread`,value:f(t.spread)}),t.color&&(!s.color||!s.color.id)){const n=t.color;i.push({layer:e.name,layerId:e.id,property:`${C} Color`,value:`rgb(${Math.round(n.r*255)}, ${Math.round(n.g*255)}, ${Math.round(n.b*255)})`})}}}function k(e){const i={};console.log(`Grouping ${e.length} usages by layer`);const t=new Map,s=[...e].sort((r,C)=>{const n=r.layer.localeCompare(C.layer);return n!==0?n:r.property.localeCompare(C.property)});for(const r of s){i[r.layer]||(i[r.layer]=[],t.set(r.layer,new Set));const C=t.get(r.layer),n=`${r.property}_${r.id||""}`,o=["paddingLeft","paddingRight","paddingTop","paddingBottom","itemSpacing","gap"].some(a=>r.property.includes(a));console.log(`Layer: ${r.layer}, Property: ${r.property}, isSpacing: ${o}, isDuplicate: ${C.has(n)}`),(!C.has(n)||o)&&(i[r.layer].push(r),C.add(n))}for(const[r,C]of Object.entries(i))console.log(`Layer ${r}: ${C.length} usages after grouping`);return i}async function M(){I();const e=await N(),i=figma.currentPage.selection,t=H(i),s=[],r=[];for(const o of t){const a=b(o);for(const{layer:p,property:c,id:u}of a){const g=e.get(u);if(!g){s.push({layer:p,layerId:o.id,property:c,name:u,type:"STRING",origin:"external",id:u});continue}s.push({layer:p,layerId:o.id,property:c,name:g.name,type:g.type,origin:g.origin,colorValue:g.colorValue,id:u})}E(o,r),A(o,r),O(o,r)}const C=new Map;s.forEach((o,a)=>{if(!C.has(o.layerId)){const p=figma.getNodeById(o.layerId);if(p){let c="UNKNOWN";if(p.type==="COMPONENT"||p.type==="INSTANCE")c=p.type;else if("layoutMode"in p){const u=p;u.layoutWrap==="WRAP"?c="AUTO_WRAP":u.layoutMode==="HORIZONTAL"?c="AUTO_HORIZONTAL":u.layoutMode==="VERTICAL"?c="AUTO_VERTICAL":c=p.type}else c=p.type;C.set(o.layerId,{id:o.layerId,name:o.layer,order:a,type:c})}}}),r.forEach((o,a)=>{if(!C.has(o.layerId)){const p=figma.getNodeById(o.layerId);if(p){let c="UNKNOWN";if(p.type==="COMPONENT"||p.type==="INSTANCE")c=p.type;else if("layoutMode"in p){const u=p;u.layoutWrap==="WRAP"?c="AUTO_WRAP":u.layoutMode==="HORIZONTAL"?c="AUTO_HORIZONTAL":u.layoutMode==="VERTICAL"?c="AUTO_VERTICAL":c=p.type}else c=p.type;C.set(o.layerId,{id:o.layerId,name:o.layer,order:s.length+a,type:c})}}});const n=k(s);console.log("Final usages count:",s.length),console.log("Layers with variables:",Object.keys(n).length),console.log("Unbound usages count:",r.length),console.log("Total nodes in layerInfoMap:",C.size);const l=s.length===0&&r.length===0;figma.ui.postMessage({byLayer:n,unbound:r,layerInfoMap:Object.fromEntries(C),noVariablesFound:l})}function B(){figma.showUI(V.replace("</head>",`<style>${w}</style></head>`),{width:300,height:400,title:"Variable Inspector"}),figma.ui.onmessage=e=>{if(e.type==="resize")figma.ui.resize(e.width,e.height);else if(e.type==="select-node"){const i=figma.getNodeById(e.nodeId);i&&(figma.currentPage.selection=[i],figma.viewport.scrollAndZoomIntoView([i]))}},figma.on("selectionchange",()=>{M().catch(e=>console.error("updateInspector error",e))}),M().catch(e=>console.error("updateInspector error",e))}B();
+}
+
+.merge-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1969d2;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.merge-badge:hover {
+  background: #1454ab;
+}
+
+.pill-wrapper {
+  display: inline-block;
+  margin: 0;
+}
+
+.variable-path {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: #f7fafd;
+  border-left: 2px solid #1969d2;
+  font-size: 11px;
+  color: #444;
+  border-radius: 0 4px 4px 0;
+  animation: slide-down 150ms ease-out;
+}
+
+.path-content {
+  font-family: 'Monaco', 'Menlo', monospace;
+  white-space: nowrap;
+}
+
+.alias-tag {
+  color: #b06000;
+  font-style: italic;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  margin: -1rem -1rem 1rem -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  z-index: 10;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sort-toggle {
+  display: inline-flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sort-toggle button {
+  background: #fff;
+  border: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+}
+
+.sort-toggle button:last-child { border-right: none; }
+.sort-toggle button.active { background: #1969d2; color: #fff; }
+
+.property-section {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e6e6e6;
+  padding-bottom: 12px;
+}
+
+.property-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.property-row-layer {
+  color: #1969d2;
+}
+
+.property-row-layer:hover { text-decoration: underline; }
+
+.stats-dashboard {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #f7fafd;
+  border-radius: 6px;
+  border: 1px solid #e0e8f0;
+}
+
+.stats-line {
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 4px;
+}
+
+.stats-bar {
+  position: relative;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.stats-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1969d2, #19a3d2);
+  transition: width 0.3s ease;
+}
+
+.stats-bar-label {
+  position: absolute;
+  top: -16px;
+  right: 0;
+  font-size: 10px;
+  color: #666;
+}
+
+.color-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  margin-right: 4px;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 0 3px, 3px -3px, -3px 0;
+}
+
+.rescan-btn {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #555;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rescan-btn:hover {
+  color: #1969d2;
+  border-color: #1969d2;
+}
+
+.rescan-btn.scanning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.search-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1969d2;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: #666;
+  margin-right: 4px;
+}
+
+.chip {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.15s;
+}
+
+.chip:hover {
+  border-color: #1969d2;
+  color: #1969d2;
+}
+
+.chip.active {
+  background: #1969d2;
+  color: #fff;
+  border-color: #1969d2;
+}
+
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 2rem 1rem;
+  font-size: 14px;
+}`,c={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},Z={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},W=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"];function X(){try{return!0}catch(e){return!1}}const E=X(),y={log:(...e)=>{E||console.log(...e)},warn:(...e)=>{E||console.warn(...e)},error:(...e)=>{E||console.error(...e)}},S=new Set,V=new Set;function K(e,n,t){return`${e}|${n}`}function J(){S.clear(),V.clear()}function v(e,n,t){const r=K(e,n);return y.log(`Checking property: ${r}, propertyName: ${n}, exists: ${V.has(r)}`),W.some(o=>n.includes(o))?(y.log(`Skipping deduplication for spacing property: ${n}`),V.add(r),!1):V.has(r)?!0:(V.add(r),!1)}const I=/^I?\d+:\d+(;\d+:\d+)*$/,Q=/^I(\d+:\d+)/;function F(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!I.test(n.parent.name)?n.parent.name:I.test(n.name)?null:n.name:null}function D(e,n){var i;let t=e,r=0;for(;t&&r<n;){const o=t.name;if(typeof o=="string"&&!I.test(o)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return o;t=(i=t.parent)!=null?i:null,r++}return null}function e1(e){const n=Q.exec(e);if(!n)return null;const t=figma.getNodeById(n[1]);if(!t)return null;if(!I.test(t.name))return t.name;if(t.type==="INSTANCE"){const r=F(t);if(r)return r}return D(t.parent,5)}function u(e){if(!I.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=F(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!I.test(r.name))return r.name}const n=D(e.parent,10);if(n)return n;const t=e1(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const n1=[{key:"minWidth",name:c.MIN_WIDTH},{key:"maxWidth",name:c.MAX_WIDTH},{key:"minHeight",name:c.MIN_HEIGHT},{key:"maxHeight",name:c.MAX_HEIGHT}];function t1(e,n){var r;const t=e.boundVariables;if(t)for(const{key:i,name:o}of n1){const C=(r=t[i])==null?void 0:r.id;C&&n.push({layer:u(e),property:o,id:C})}}function r1(e,n){var r,i;const t=e.layoutGrids;if(Array.isArray(t))for(const o of t){const C=(i=(r=o.boundVariables)==null?void 0:r.color)==null?void 0:i.id;C&&n.push({layer:u(e),property:c.GRID_COLOR,id:C})}}function o1(e,n){var r,i;const t=(i=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:i.id;t&&n.push({layer:u(e),property:c.VISIBLE,id:t})}function i1(e,n){var o,C;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(o=t.textDecoration)==null?void 0:o.id,i=(C=t.textCase)==null?void 0:C.id;r&&n.push({layer:u(e),property:c.TEXT_DECORATION,id:r}),i&&n.push({layer:u(e),property:c.TEXT_CASE,id:i})}function C1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[i,o]of Object.entries(t))o!=null&&o.id&&n.push({layer:u(e),property:`Component / ${i}`,id:o.id})}function s1(e,n){var C;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const i=new Set,o=new Set;for(const s of t){const l=(C=s.boundVariables)==null?void 0:C.color;l!=null&&l.id&&!i.has(l.id)&&(o.add(l.id),i.add(l.id))}if(o.size>0){const s=Array.from(o)[0];n.push({layer:u(e),property:c.FILL,id:s}),o.size>1&&y.log(`${e.name} has ${o.size} fill variables, only the first is shown`)}}function a1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const o=(t=r.boundVariables)==null?void 0:t.color;o!=null&&o.id&&n.push({layer:u(e),property:c.STROKE_COLOR,id:o.id})}}function $(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function l1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function p1(e,n){var o,C;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const s of t)r[s.type]=((o=r[s.type])!=null?o:0)+1;const i={};for(const s of t){if(!s.boundVariables)continue;const a=r[s.type];i[s.type]=((C=i[s.type])!=null?C:0)+1;const l=i[s.type],d=$(s.type),p=a>1?`${d} ${l}`:d;for(const[b,f]of Object.entries(s.boundVariables))if(f.id){const g=l1(b,s.type);n.push({layer:u(e),property:`${p} ${b}`,id:f.id,effectGroup:p,subProp:g})}}}function c1(e,n){var C,s;const r=e.boundVariables;if(!r)return;const i=new Set(["color","fills","fills.0"]);for(const[a,l]of Object.entries(r)){if(i.has(a)||a.startsWith("fills."))continue;const d=l;if(d.id){const p=(C=Z[a])!=null?C:a;n.push({layer:u(e),property:p,id:d.id})}}const o=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const a of o){const l=e,d=r[a];if(l[a]!==void 0&&(d!=null&&d.id)){const p=(s=Z[a])!=null?s:a;n.push({layer:u(e),property:p,id:d.id})}}}function d1(e,n){var o;const t=e.boundVariables;if(!t)return;const r={fontSize:c.FONT_SIZE,fontWeight:c.FONT_WEIGHT,fontFamily:c.FONT_FAMILY,letterSpacing:c.LETTER_SPACING,lineHeight:c.LINE_HEIGHT,paragraphSpacing:c.PARAGRAPH_SPACING};for(const[C,s]of Object.entries(r)){const a=t[C];a!=null&&a.id&&(n.push({layer:u(e),property:s,id:a.id}),C==="fontSize"&&S.add(e.id))}const i={};z(t,i);for(const[C,s]of Object.entries(i)){let a=C;for(const[l,d]of Object.entries(r))if(C.includes(l)){a=d,l==="fontSize"&&S.add(e.id);break}a===C&&(a=(o=Z[C])!=null?o:C);for(const l of s)n.push({layer:u(e),property:a,id:l})}}function z(e,n,t=[]){if(!(!e||typeof e!="object")){if(typeof e.id=="string"){const r=t.join(".");!r.startsWith("fills.")&&r!=="fills"&&(n[r]||(n[r]=[]),n[r].push(e.id));return}for(const r of Object.keys(e))r==="fills"||t.length>0&&t[0]==="fills"||z(e[r],n,[...t,r])}}function U(e){const n=[];return s1(e,n),a1(e,n),p1(e,n),t1(e,n),r1(e,n),o1(e,n),e.type==="TEXT"&&(d1(e,n),i1(e,n)),e.type==="INSTANCE"&&C1(e,n),c1(e,n),n}function j(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children)}return n}const P=new Map,u1=10;async function R(e,n){var l,d;const t=[];let r=e;for(let p=0;p<u1;p++){t.push(r.name);const b=Object.keys((l=r.valuesByMode)!=null?l:{});if(b.length===0)break;const f=r.valuesByMode[b[0]];if(typeof f=="object"&&f!==null&&f.type==="VARIABLE_ALIAS"){const g=f.id,m=await figma.variables.getVariableByIdAsync(g);if(!m||m.id===r.id)break;r=m;continue}break}const i=t.length>1,o=await f1(r.variableCollectionId),C=r.name.split("/").filter(p=>p.length>0),s=(d=C.pop())!=null?d:r.name,a={collection:o,groups:C,name:s,isAlias:i};return n&&(a.library=g1(r)),i&&(a.aliasChain=t),a}async function f1(e){if(P.has(e))return P.get(e);const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)if(P.set(t.id,t.name),t.id===e)return t.name;return"Unknown collection"}function g1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function A(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=e.valuesByMode[n[0]];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function m1(){const e=new Map;return await h1(e),await y1(e),y.log("loadVariables: found",e.size,"variables"),e}async function h1(e){const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)for(const r of t.variableIds){const i=await figma.variables.getVariableByIdAsync(r);if(!i)continue;const o=await R(i,!1);e.set(r,{name:i.name,type:i.resolvedType,origin:"local",colorValue:A(i),path:o})}}async function y1(e){const n=figma.currentPage.selection,t=j(n),r=new Set;for(const i of t){const o=U(i);for(const{id:C}of o)e.has(C)||r.add(C)}for(const i of r)try{const o=await figma.variables.getVariableByIdAsync(i);if(!o)continue;const C=await R(o,!0);if(e.set(i,{name:o.name,type:o.resolvedType,origin:"external",colorValue:A(o),path:C}),typeof figma.variables.importVariableByKeyAsync=="function"){const s=await figma.variables.importVariableByKeyAsync(o.key);if(s){const a=await R(s,!0);e.set(i,{name:s.name,type:s.resolvedType,origin:"external",colorValue:A(s),path:a})}}}catch(o){y.warn(`Failed to resolve variable ${i}:`,o)}}function N(e){return Number(e.toFixed(2)).toString()}function b1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function v1(e,n){var o,C,s,a,l,d;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const p of t)r[p.type]=((o=r[p.type])!=null?o:0)+1;const i={};for(const p of t){const b=r[p.type];i[p.type]=((C=i[p.type])!=null?C:0)+1;const f=i[p.type],g=$(p.type),m=b>1?`${g} ${f}`:g,T=p.type.includes("BLUR")||p.type.includes("SHADOW"),L=(s=p.boundVariables)!=null?s:{},M=u(e);if(typeof p.radius=="number"){const h=L.radius;if(!(h!=null&&h.id)){const H=T?"Blur":"Radius";n.push({layer:M,layerId:e.id,property:`${m} ${H}`,value:N(p.radius),effectGroup:m,subProp:H})}}if(p.type.includes("SHADOW")&&p.offset){const h=(a=L.offset)!=null?a:{};typeof p.offset.x=="number"&&!((l=h.x)!=null&&l.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset X`,value:N(p.offset.x),effectGroup:m,subProp:"Offset X"}),typeof p.offset.y=="number"&&!((d=h.y)!=null&&d.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset Y`,value:N(p.offset.y),effectGroup:m,subProp:"Offset Y"})}if(typeof p.spread=="number"){const h=L.spread;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Spread`,value:N(p.spread),effectGroup:m,subProp:"Spread"})}if(p.color){const h=L.color;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Color`,value:b1(p.color),effectGroup:m,subProp:"Color"})}}}function w(e){return Number(e.toFixed(2)).toString()}function G(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function L1(e,n){var t,r,i,o;if("fills"in e&&Array.isArray(e.fills))for(const C of e.fills){const s=C;!((r=(t=s.boundVariables)==null?void 0:t.color)!=null&&r.id)&&s.color&&n.push({layer:u(e),layerId:e.id,property:c.FILL,value:G(s.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let C;for(const s of e.strokes){const a=s;if(!((o=(i=a.boundVariables)==null?void 0:i.color)!=null&&o.id)&&a.color){C=a.color;break}}C&&!v(e.id,c.STROKE)&&(n.push({layer:u(e),layerId:e.id,property:c.STROKE,value:G(C)}),e.strokes.length>1&&y.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function M1(e,n){var r,i;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(i=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&i.id||v(e.id,c.OPACITY)||n.push({layer:u(e),layerId:e.id,property:c.OPACITY,value:w(t)})}function w1(e,n){var C,s,a,l,d,p,b;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((s=(C=t.strokes)==null?void 0:C.length)!=null?s:0)>0))return;const i=e.strokeWeight,o="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof i=="number"&&i!==0&&!((l=(a=e.boundVariables)==null?void 0:a.strokeWeight)!=null&&l.id)&&!o&&(v(e.id,c.STROKE_WEIGHT)||n.push({layer:u(e),layerId:e.id,property:c.STROKE_WEIGHT,value:w(i)}));for(const f of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(f in e))continue;const g=e[f];if(typeof g!="number"||g===0||(p=(d=e.boundVariables)==null?void 0:d[f])!=null&&p.id)continue;const m=(b=Z[f])!=null?b:f;v(e.id,m)||n.push({layer:u(e),layerId:e.id,property:m,value:w(g)})}}function H1(e,n){var t,r,i,o,C;if("cornerRadius"in e){const s=e.cornerRadius,a="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof s=="number"&&s!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!a&&(v(e.id,c.CORNER_RADIUS)||n.push({layer:u(e),layerId:e.id,property:c.CORNER_RADIUS,value:w(s)}))}for(const s of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(s in e))continue;const a=e[s];if(typeof a!="number"||a===0||(o=(i=e.boundVariables)==null?void 0:i[s])!=null&&o.id)continue;const l=(C=Z[s])!=null?C:s;v(e.id,l)||n.push({layer:u(e),layerId:e.id,property:l,value:w(a)})}}function x1(e,n){var i,o;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:c.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:c.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:c.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:c.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:C,displayName:s,skipIfProcessed:a}of r){if(a&&C==="fontSize"&&S.has(t.id))continue;const l=t[C];typeof l!="number"||l===0||(o=(i=e.boundVariables)==null?void 0:i[C])!=null&&o.id||v(e.id,s)||n.push({layer:u(e),layerId:e.id,property:s,value:w(l)})}}function I1(e,n){var r,i;const t=[{key:"paddingLeft",displayName:c.PADDING_LEFT},{key:"paddingRight",displayName:c.PADDING_RIGHT},{key:"paddingTop",displayName:c.PADDING_TOP},{key:"paddingBottom",displayName:c.PADDING_BOTTOM},{key:"itemSpacing",displayName:c.ITEM_SPACING}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||(y.log(`Found spacing property ${o} = ${s} on node ${e.name}`),v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)}))}}function V1(e,n){var r,i;const t=[{key:"minWidth",displayName:c.MIN_WIDTH},{key:"maxWidth",displayName:c.MAX_WIDTH},{key:"minHeight",displayName:c.MIN_HEIGHT},{key:"maxHeight",displayName:c.MAX_HEIGHT}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)})}}function Z1(e,n){const t=e;M1(t,n),w1(t,n),H1(t,n),x1(t,n),I1(t,n),V1(t,n)}function N1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const i=e;if(!i.mainComponent)return null;const o=i.mainComponent.id,C=((n=i.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?i.mainComponent.parent.id:"",s=JSON.stringify(_((t=i.componentProperties)!=null?t:{})),a=JSON.stringify(_((r=i.boundVariables)!=null?r:{}));return[o,C,s,a].join("|")}catch(i){return null}}function S1(e){var t,r;const n=new Map;for(const i of e){const o=(t=N1(i))!=null?t:`__node__${i.id}`,C=(r=n.get(o))!=null?r:[];C.push(i),n.set(o,C)}return n}function _(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function T1(e,n,t){const r=Object.values(e).flat(),i=r.length,o=n.length,C=i+o,s=C===0?0:i/C,a={local:0,external:0},l={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)a[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(l[d.type]+=1);return{totalVariables:i,totalHardcoded:o,variableCoverage:s,byOrigin:a,byType:l,layerCount:Object.keys(e).length,scanDurationMs:t}}function E1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function P1(e,n,t){const r=new Map,i=async(o,C,s)=>{if(r.has(o))return;const a=await figma.getNodeByIdAsync(o);if(a){const l=t.get(o),d={id:o,name:C,order:s,type:E1(a)};l&&(d.count=l.count,d.mergedNodeIds=l.nodeIds),r.set(o,d)}};for(let o=0;o<e.length;o++){const C=e[o];await i(C.layerId,C.layer,o)}for(let o=0;o<n.length;o++){const C=n[o];await i(C.layerId,C.layer,e.length+o)}return r}function k1(e){var i;const n={};y.log(`Grouping ${e.length} usages by layer`);const t=new Map,r=[...e].sort((o,C)=>{const s=o.layer.localeCompare(C.layer);return s!==0?s:o.property.localeCompare(C.property)});for(const o of r){n[o.layerId]||(n[o.layerId]=[],t.set(o.layerId,new Set));const C=t.get(o.layerId),s=`${o.property}_${(i=o.id)!=null?i:""}`,a=W.some(l=>o.property.includes(l));y.log(`Layer: ${o.layer}, Property: ${o.property}, isSpacing: ${a}, isDuplicate: ${C.has(s)}`),(!C.has(s)||a)&&(n[o.layerId].push(o),C.add(s))}for(const[o,C]of Object.entries(n))y.log(`Layer ${o}: ${C.length} usages after grouping`);return n}async function k(){try{await R1()}catch(e){y.error("updateInspector error",e);const n={type:"error",message:String(e)};figma.ui.postMessage(n)}}async function R1(){J();const e=Date.now();figma.ui.postMessage({type:"scan-start"});const n=await m1(),t=figma.currentPage.selection,r=j(t),i=S1(r),o=[],C=[],s=new Map;for(const[,f]of i){const g=f[0];f.length>1&&g.type==="INSTANCE"&&s.set(g.id,{count:f.length,nodeIds:f.map(L=>L.id)});const T=U(g);for(const L of T){const{layer:M,property:h,id:H,effectGroup:O,subProp:B}=L,x=n.get(H);o.push(x?{layer:M,layerId:g.id,property:h,name:x.name,type:x.type,origin:x.origin,colorValue:x.colorValue,id:H,path:x.path,effectGroup:O,subProp:B}:{layer:M,layerId:g.id,property:h,name:H,type:"STRING",origin:"external",id:H,effectGroup:O,subProp:B})}L1(g,C),Z1(g,C),v1(g,C)}const a=await P1(o,C,s),l=k1(o);y.log("Final usages count:",o.length),y.log("Layers with variables:",Object.keys(l).length),y.log("Unbound usages count:",C.length),y.log("Total nodes in layerInfoMap:",a.size);const d=Date.now()-e,p=T1(l,C,d),b={type:"render",byLayer:l,unbound:C,layerInfoMap:Object.fromEntries(a),noVariablesFound:o.length===0&&C.length===0,stats:p,scanDurationMs:d};figma.ui.postMessage(b)}function A1(){figma.showUI(q.replace("</head>",`<style>${Y}</style></head>`),{width:300,height:400,title:"Variable Inspector"}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"&&k()};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{k()},300)}),k()}A1();

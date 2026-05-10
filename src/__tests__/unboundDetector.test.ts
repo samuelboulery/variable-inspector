@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from '../unboundDetector';
 import { resetDedupSets } from '../dedup';
 import { UnboundUsage } from '../types';
-import { makeRectNode, makeTextNode } from '../__mocks__/figma';
+import { makeRectNode, makeTextNode, makeFrameNode } from '../__mocks__/figma';
 
 beforeEach(() => {
   resetDedupSets();
@@ -488,5 +488,41 @@ describe('getUnboundFloatUsages — spacing', () => {
     const usages: UnboundUsage[] = [];
     getUnboundFloatUsages(node, usages);
     expect(usages.find(u => u.property === 'Padding Left')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUnboundFloatUsages — dimension constraints
+// ---------------------------------------------------------------------------
+
+describe('getUnboundFloatUsages — dimension constraints', () => {
+  it('reports unbound minWidth and maxWidth', () => {
+    const node = {
+      ...makeFrameNode({ id: 'f1', name: 'Card' }),
+      minWidth: 100,
+      maxWidth: 400,
+    } as unknown as SceneNode;
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property === 'Min Width')?.value).toBe('100');
+    expect(usages.find(u => u.property === 'Max Width')?.value).toBe('400');
+  });
+
+  it('skips dimension constraints bound to variables', () => {
+    const node = {
+      ...makeFrameNode({ id: 'f1' }),
+      minWidth: 100,
+      boundVariables: { minWidth: { id: 'var-mw' } },
+    } as unknown as SceneNode;
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property === 'Min Width')).toBeUndefined();
+  });
+
+  it('skips dimension constraints when value is null or undefined', () => {
+    const node = makeFrameNode({ id: 'f1', name: 'Card' });
+    const usages: UnboundUsage[] = [];
+    getUnboundFloatUsages(node, usages);
+    expect(usages.find(u => u.property === 'Min Width')).toBeUndefined();
   });
 });

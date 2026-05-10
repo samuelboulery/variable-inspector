@@ -222,8 +222,36 @@ function getUnboundSpacingUsages(node: NodeWithBindings, unboundUsages: UnboundU
 }
 
 /**
+ * Detects unbound dimension constraints (minWidth, maxWidth, minHeight, maxHeight) on a node.
+ * Zero values are skipped.
+ */
+function getUnboundDimensionUsages(node: NodeWithBindings, unboundUsages: UnboundUsage[]): void {
+  const dimensionProperties = [
+    { key: 'minWidth', displayName: PROPERTY_NAMES.MIN_WIDTH },
+    { key: 'maxWidth', displayName: PROPERTY_NAMES.MAX_WIDTH },
+    { key: 'minHeight', displayName: PROPERTY_NAMES.MIN_HEIGHT },
+    { key: 'maxHeight', displayName: PROPERTY_NAMES.MAX_HEIGHT },
+  ];
+
+  for (const { key, displayName } of dimensionProperties) {
+    if (!(key in node)) continue;
+    const value = node[key] as unknown;
+    if (typeof value !== 'number' || value === 0) continue;
+    if (node.boundVariables?.[key]?.id) continue;
+    if (!trackProperty(node.id, displayName)) {
+      unboundUsages.push({
+        layer: getLayerDisplayName(node),
+        layerId: node.id,
+        property: displayName,
+        value: fmt(value),
+      });
+    }
+  }
+}
+
+/**
  * Detects all unbound float/numeric properties on a node (opacity, stroke weight,
- * corner radius, text properties, and spacing).
+ * corner radius, text properties, spacing, and dimension constraints).
  *
  * @param node - The scene node to check.
  * @param unboundUsages - Array to append found unbound usages to.
@@ -235,6 +263,7 @@ export function getUnboundFloatUsages(node: SceneNode, unboundUsages: UnboundUsa
   getUnboundCornerRadiusUsages(n, unboundUsages);
   getUnboundTextPropertyUsages(n, unboundUsages);
   getUnboundSpacingUsages(n, unboundUsages);
+  getUnboundDimensionUsages(n, unboundUsages);
 }
 
 // getUnboundEffectUsages was extracted to ./effectDetector. Re-export so

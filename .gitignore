@@ -2,3 +2,13 @@ node_modules/
 .DS_Store
 npm-debug.log*
 .vscode/
+
+# Knowledge graph (rebuilt locally, never versioned)
+graphify-out/
+
+# Per-developer Claude overrides
+.claude/local/
+.claude/settings.local.json
+
+# Build artifact noise (keep dist/code.js + dist/manifest.json tracked)
+dist/.DS_Store

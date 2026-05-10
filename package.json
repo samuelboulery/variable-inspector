@@ -11,9 +11,9 @@
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.110.0",
-    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/coverage-v8": "^2.1.9",
     "typescript": "^5.8.3",
-    "vite": "^4.0.0",
-    "vitest": "^1.6.1"
+    "vite": "^6.4.2",
+    "vitest": "^2.1.9"
   }
 }

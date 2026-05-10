@@ -17,6 +17,7 @@ export default defineConfig({
         'src/main.js',
         'src/components.js',
         'src/code.ts',
+        'src/types.ts',
       ],
       thresholds: {
         lines: 80,

@@ -19,3 +19,6 @@ public/code.js
 
 # Coverage reports
 coverage/
+
+# Superpowers brainstorming visual companion artifacts
+.superpowers/

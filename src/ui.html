@@ -15,6 +15,17 @@
     </svg>
   </div>
   <script>
+    // Surfaçage des erreurs runtime — sinon le panneau Figma reste blanc
+    // sans aucun feedback. Affiche l'erreur dans le DOM directement.
+    window.addEventListener('error', (ev) => {
+      const app = document.getElementById('app');
+      if (!app) return;
+      const errBox = document.createElement('div');
+      errBox.style.cssText = 'padding:1rem;background:#fee;color:#900;font:12px monospace;white-space:pre-wrap;';
+      errBox.textContent = `JS error: ${ev.message}\nat ${ev.filename}:${ev.lineno}:${ev.colno}`;
+      app.appendChild(errBox);
+    });
+
     // Gestion du redimensionnement
     const resizeHandle = document.querySelector('.resize-handle');
     let isResizing = false;
@@ -142,10 +153,96 @@
       'Background Blur': '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.6053 4.01333C18.2621 4.08068 18.8706 4.38929 19.313 4.87944C19.7553 5.36959 20.0001 6.00642 20 6.66667V17.3333L19.9867 17.6053C19.9239 18.2154 19.6528 18.7851 19.2191 19.2187C18.7853 19.6522 18.2154 19.9229 17.6053 19.9853L17.3333 20H6.66667L6.39467 19.9867C5.78463 19.9239 5.21486 19.6528 4.78135 19.2191C4.34783 18.7853 4.07707 18.2154 4.01467 17.6053L4 17.3333V6.66667C3.99986 6.00642 4.24466 5.36959 4.68702 4.87944C5.12939 4.38929 5.73786 4.08068 6.39467 4.01333L6.66667 4H17.3333L17.6053 4.01333ZM6.66667 5.33333C6.31304 5.33333 5.97391 5.47381 5.72386 5.72386C5.47381 5.97391 5.33333 6.31304 5.33333 6.66667V17.3333C5.33333 17.687 5.47381 18.0261 5.72386 18.2761C5.97391 18.5262 6.31304 18.6667 6.66667 18.6667H17.3333C17.687 18.6667 18.0261 18.5262 18.2761 18.2761C18.5262 18.0261 18.6667 17.687 18.6667 17.3333V6.66667C18.6667 6.31304 18.5262 5.97391 18.2761 5.72386C18.0261 5.47381 17.687 5.33333 17.3333 5.33333H6.66667ZM12 15C12.2652 15 12.5196 15.1054 12.7071 15.2929C12.8946 15.4804 13 15.7348 13 16C13 16.2652 12.8946 16.5196 12.7071 16.7071C12.5196 16.8946 12.2652 17 12 17C11.7348 17 11.4804 16.8946 11.2929 16.7071C11.1054 16.5196 11 16.2652 11 16C11 15.7348 11.1054 15.4804 11.2929 15.2929C11.4804 15.1054 11.7348 15 12 15ZM8 15.3333C8.17681 15.3333 8.34638 15.4036 8.47141 15.5286C8.59643 15.6536 8.66667 15.8232 8.66667 16C8.66667 16.1768 8.59643 16.3464 8.47141 16.4714C8.34638 16.5964 8.17681 16.6667 8 16.6667C7.82319 16.6667 7.65362 16.5964 7.5286 16.4714C7.40357 16.3464 7.33333 16.1768 7.33333 16C7.33333 15.8232 7.40357 15.6536 7.5286 15.5286C7.65362 15.4036 7.82319 15.3333 8 15.3333ZM16 15.3333C16.1768 15.3333 16.3464 15.4036 16.4714 15.5286C16.5964 15.6536 16.6667 15.8232 16.6667 16C16.6667 16.1768 16.5964 16.3464 16.4714 16.4714C16.3464 16.5964 16.1768 16.6667 16 16.6667C15.8232 16.6667 15.6536 16.5964 15.5286 16.4714C15.4036 16.3464 15.3333 16.1768 15.3333 16C15.3333 15.8232 15.4036 15.6536 15.5286 15.5286C15.6536 15.4036 15.8232 15.3333 16 15.3333ZM12 10.6667C12.3536 10.6667 12.6928 10.8071 12.9428 11.0572C13.1929 11.3072 13.3333 11.6464 13.3333 12C13.3333 12.3536 13.1929 12.6928 12.9428 12.9428C12.6928 13.1929 12.3536 13.3333 12 13.3333C11.6464 13.3333 11.3072 13.1929 11.0572 12.9428C10.8071 12.6928 10.6667 12.3536 10.6667 12C10.6667 11.6464 10.8071 11.3072 11.0572 11.0572C11.3072 10.8071 11.6464 10.6667 12 10.6667ZM8 11C8.26522 11 8.51957 11.1054 8.70711 11.2929C8.89464 11.4804 9 11.7348 9 12C9 12.2652 8.89464 12.5196 8.70711 12.7071C8.51957 12.8946 8.26522 13 8 13C7.73478 13 7.48043 12.8946 7.29289 12.7071C7.10536 12.5196 7 12.2652 7 12C7 11.7348 7.10536 11.4804 7.29289 11.2929C7.48043 11.1054 7.73478 11 8 11ZM16 11C16.2652 11 16.5196 11.1054 16.7071 11.2929C16.8946 11.4804 17 11.7348 17 12C17 12.2652 16.8946 12.5196 16.7071 12.7071C16.5196 12.8946 16.2652 13 16 13C15.7348 13 15.4804 12.8946 15.2929 12.7071C15.1054 12.5196 15 12.2652 15 12C15 11.7348 15.1054 11.4804 15.2929 11.2929C15.4804 11.1054 15.7348 11 16 11ZM12 7C12.2652 7 12.5196 7.10536 12.7071 7.29289C12.8946 7.48043 13 7.73478 13 8C13 8.26522 12.8946 8.51957 12.7071 8.70711C12.5196 8.89464 12.2652 9 12 9C11.7348 9 11.4804 8.89464 11.2929 8.70711C11.1054 8.51957 11 8.26522 11 8C11 7.73478 11.1054 7.48043 11.2929 7.29289C11.4804 7.10536 11.7348 7 12 7ZM8 7.33333C8.17681 7.33333 8.34638 7.40357 8.47141 7.5286C8.59643 7.65362 8.66667 7.82319 8.66667 8C8.66667 8.17681 8.59643 8.34638 8.47141 8.47141C8.34638 8.59643 8.17681 8.66667 8 8.66667C7.82319 8.66667 7.65362 8.59643 7.5286 8.47141C7.40357 8.34638 7.33333 8.17681 7.33333 8C7.33333 7.82319 7.40357 7.65362 7.5286 7.5286C7.65362 7.40357 7.82319 7.33333 8 7.33333ZM16 7.33333C16.1768 7.33333 16.3464 7.40357 16.4714 7.5286C16.5964 7.65362 16.6667 7.82319 16.6667 8C16.6667 8.17681 16.5964 8.34638 16.4714 8.47141C16.3464 8.59643 16.1768 8.66667 16 8.66667C15.8232 8.66667 15.6536 8.59643 15.5286 8.47141C15.4036 8.34638 15.3333 8.17681 15.3333 8C15.3333 7.82319 15.4036 7.65362 15.5286 7.5286C15.6536 7.40357 15.8232 7.33333 16 7.33333Z" fill="currentColor"/></svg>'
     };
 
-    // Fonction pour créer le pill d'une variable
+    // Persistence locale (Features F.2 + G.6). Figma sert l'UI via une data:
+    // URL, qui désactive localStorage — try/catch + fallback in-memory.
+    const SORT_KEY = 'vi.sortMode';
+    const SEARCH_KEY = 'vi.search';
+    const FILTER_TYPES_KEY = 'vi.filter.types';
+    const FILTER_ORIGINS_KEY = 'vi.filter.origins';
+
+    let sortModeMemory = 'byLayer';
+    let filterMemory = { search: '', types: [], origins: [] };
+
+    function getSortMode() {
+      try {
+        const v = localStorage.getItem(SORT_KEY);
+        if (v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
+      } catch (_) { /* data: URL — fallback below */ }
+      return sortModeMemory;
+    }
+    function setSortMode(mode) {
+      sortModeMemory = mode;
+      try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
+    }
+
+    function getFilterState() {
+      try {
+        const types = JSON.parse(localStorage.getItem(FILTER_TYPES_KEY) || '[]');
+        const origins = JSON.parse(localStorage.getItem(FILTER_ORIGINS_KEY) || '[]');
+        return {
+          search: localStorage.getItem(SEARCH_KEY) || '',
+          types: Array.isArray(types) ? types : [],
+          origins: Array.isArray(origins) ? origins : [],
+        };
+      } catch (_) {
+        return { search: filterMemory.search, types: [...filterMemory.types], origins: [...filterMemory.origins] };
+      }
+    }
+    function setFilterState(filter) {
+      filterMemory = { search: filter.search, types: [...filter.types], origins: [...filter.origins] };
+      try {
+        localStorage.setItem(SEARCH_KEY, filter.search);
+        localStorage.setItem(FILTER_TYPES_KEY, JSON.stringify(filter.types));
+        localStorage.setItem(FILTER_ORIGINS_KEY, JSON.stringify(filter.origins));
+      } catch (_) { /* no-op */ }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Cache du dernier message render pour re-render après toggle sort/filter
+    let lastRender = null;
+    let filtersExpanded = false;
+
+    // Singleton: pill actuellement ouvert (single-open semantics)
+    let openPathBox = null;
+
+    // Construit le breadcrumb du chemin de résolution d'une variable
+    function buildPathBreadcrumb(path) {
+      const root = document.createElement('div');
+      root.className = 'path-content';
+      const parts = [];
+      if (path.library) parts.push(path.library);
+      parts.push(path.collection);
+      for (const g of path.groups) parts.push(g);
+      parts.push(path.name);
+      root.textContent = '└─ ' + parts.join(' / ');
+      if (path.isAlias) {
+        const aliasTag = document.createElement('span');
+        aliasTag.className = 'alias-tag';
+        aliasTag.textContent = ' (alias)';
+        root.appendChild(aliasTag);
+      }
+      return root;
+    }
+
+    // Fonction pour créer le pill d'une variable (avec wrapper pour breadcrumb path)
     function createVariablePill(item) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pill-wrapper';
+
       const pill = document.createElement("span");
       pill.className = `variable-pill ${item.origin}-variable`;
+      pill.style.cursor = item.path ? 'pointer' : 'default';
+
+      // Color swatch pour les variables COLOR
+      if (item.type === 'COLOR' && item.colorValue) {
+        const swatch = document.createElement('span');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = formatRGBA(item.colorValue);
+        pill.appendChild(swatch);
+      }
 
       // Ajouter l'icône de type de variable
       const typeIcon = createVariableTypeIconElement(item.type);
@@ -158,7 +255,26 @@
       nameSpan.textContent = item.name;
       pill.appendChild(nameSpan);
 
-      return pill;
+      wrapper.appendChild(pill);
+
+      if (item.path) {
+        const pathBox = document.createElement('div');
+        pathBox.className = 'variable-path';
+        pathBox.style.display = 'none';
+        pathBox.appendChild(buildPathBreadcrumb(item.path));
+        wrapper.appendChild(pathBox);
+
+        pill.addEventListener('click', () => {
+          const isOpen = pathBox.style.display === 'block';
+          if (openPathBox && openPathBox !== pathBox) {
+            openPathBox.style.display = 'none';
+          }
+          pathBox.style.display = isOpen ? 'none' : 'block';
+          openPathBox = isOpen ? null : pathBox;
+        });
+      }
+
+      return wrapper;
     }
 
     // Fonction pour créer un élément d'icône de propriété à partir de propertyIcons (réutilisable)
@@ -569,19 +685,319 @@
       return ul;
     }
 
-    // --- window.onmessage handler moved below all definitions ---
-    window.onmessage = (event) => {
-      const msg = event.data.pluginMessage;
-      const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
-      const unboundMap = {};
+    // Construit la toolbar (rescan + search + sort toggle + filter chips).
+    // Toutes les actions re-invoquent handlePluginMessage(lastRender) sans
+    // re-scan plugin-side, sauf le rescan (⟳) qui poste 'rescan'.
+    function renderToolbar() {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'toolbar';
+      const filter = getFilterState();
+      const activeFilterCount = filter.types.length + filter.origins.length;
+      const expanded = filtersExpanded;
+      toolbar.innerHTML = `
+        <div class="toolbar-row">
+          <input class="fg-search" type="text" placeholder="Rechercher" value="${escapeHtml(filter.search)}" />
+          <button class="fg-ghost fg-rescan" title="Re-scan selection" aria-label="Re-scan">
+            <svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+        <div class="toolbar-row">
+          <div class="fg-seg">
+            <button data-mode="byLayer">Calque</button>
+            <button data-mode="byProperty">Propriété</button>
+            <button data-mode="unbound">Unbound</button>
+          </div>
+          <span style="flex:1"></span>
+          <button class="fg-filter-btn" data-expanded="${expanded ? 'true' : 'false'}" aria-expanded="${expanded ? 'true' : 'false'}">
+            Filtres${activeFilterCount > 0 ? ` <span class="fg-badge">${activeFilterCount}</span>` : ''}
+            <svg class="fg-caret" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        ${expanded ? `
+        <div class="fg-filters">
+          <div class="fg-frow">
+            <span class="fg-flabel">Type</span>
+            <button class="fg-chip" data-filter="type" data-value="COLOR">Color</button>
+            <button class="fg-chip" data-filter="type" data-value="FLOAT">Float</button>
+            <button class="fg-chip" data-filter="type" data-value="STRING">String</button>
+            <button class="fg-chip" data-filter="type" data-value="BOOLEAN">Bool</button>
+          </div>
+          <div class="fg-frow">
+            <span class="fg-flabel">Origine</span>
+            <button class="fg-chip" data-filter="origin" data-value="local">Local</button>
+            <button class="fg-chip" data-filter="origin" data-value="external">External</button>
+          </div>
+        </div>` : ''}
+      `;
+
+      toolbar.querySelector('.fg-rescan').addEventListener('click', () => {
+        parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
+      });
+
+      const currentSort = getSortMode();
+      toolbar.querySelectorAll('.fg-seg button').forEach(btn => {
+        if (btn.dataset.mode === currentSort) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          if (btn.dataset.mode === getSortMode()) return;
+          setSortMode(btn.dataset.mode);
+          if (lastRender) handlePluginMessage(lastRender);
+        });
+      });
+
+      toolbar.querySelector('.fg-filter-btn').addEventListener('click', () => {
+        filtersExpanded = !filtersExpanded;
+        if (lastRender) handlePluginMessage(lastRender);
+      });
+
+      toolbar.querySelectorAll('.fg-chip').forEach(chip => {
+        const f = chip.dataset.filter;
+        const v = chip.dataset.value;
+        const arr = f === 'type' ? filter.types : filter.origins;
+        if (arr.includes(v)) chip.classList.add('active');
+        chip.addEventListener('click', () => {
+          const cur = getFilterState();
+          const target = f === 'type' ? cur.types : cur.origins;
+          const idx = target.indexOf(v);
+          if (idx >= 0) target.splice(idx, 1); else target.push(v);
+          setFilterState(cur);
+          if (lastRender) handlePluginMessage(lastRender);
+        });
+      });
+
+      let searchTimer = null;
+      const searchInput = toolbar.querySelector('.fg-search');
+      searchInput.addEventListener('input', (ev) => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const cur = getFilterState();
+          cur.search = ev.target.value;
+          setFilterState(cur);
+          if (lastRender) handlePluginMessage(lastRender);
+        }, 150);
+      });
+
+      return toolbar;
+    }
+
+    // Applique le filter state (search + types + origins) à une entrée bound.
+    function matchesFilter(entry, filter) {
+      const q = (filter.search || '').trim().toLowerCase();
+      if (q) {
+        const hay = `${entry.layer || ''} ${entry.property || ''} ${entry.name || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filter.types.length > 0 && !filter.types.includes(entry.type)) return false;
+      if (filter.origins.length > 0 && !filter.origins.includes(entry.origin)) return false;
+      return true;
+    }
+
+    // Applique le filter state à une entry unbound. Les unbound n'ont pas de
+    // type/origin (toujours hardcodé) — on ne filtre que par search sur layer
+    // + property + value. Les chips type/origin actifs masquent les unbound.
+    function matchesFilterUnbound(layer, item, filter) {
+      if (filter.types.length > 0 || filter.origins.length > 0) return false;
+      const q = (filter.search || '').trim().toLowerCase();
+      if (!q) return true;
+      const hay = `${layer || ''} ${item.property || ''} ${String(item.value || '')}`.toLowerCase();
+      return hay.includes(q);
+    }
+
+    // Filtre byLayer + unboundMap en place et retourne de nouveaux objets.
+    function applyFilters(byLayer, unboundMap, filter) {
+      const fByLayer = {};
+      for (const k of Object.keys(byLayer || {})) {
+        const kept = (byLayer[k] || []).filter(e => matchesFilter(e, filter));
+        if (kept.length > 0) fByLayer[k] = kept;
+      }
+      const fUnbound = {};
+      for (const layer of Object.keys(unboundMap || {})) {
+        const kept = (unboundMap[layer] || []).filter(it => matchesFilterUnbound(layer, it, filter));
+        if (kept.length > 0) fUnbound[layer] = kept;
+      }
+      return { byLayer: fByLayer, unboundMap: fUnbound };
+    }
+
+    // Construit le dashboard de stats affiché au-dessus des layer-sections
+    function renderStats(stats) {
+      const dashboard = document.createElement('div');
+      dashboard.className = 'stats-dashboard';
+      const coveragePct = Math.round(stats.variableCoverage * 100);
+      dashboard.innerHTML = `
+        <div class="stats-line">
+          <strong>${stats.totalVariables}</strong> variables
+          • <strong>${stats.totalHardcoded}</strong> hardcoded (${100 - coveragePct}%)
+        </div>
+        <div class="stats-line">
+          <strong>${stats.byOrigin.local}</strong> local • <strong>${stats.byOrigin.external}</strong> external
+        </div>
+        <div class="stats-bar">
+          <div class="stats-bar-fill" style="width: ${coveragePct}%"></div>
+          <span class="stats-bar-label">Coverage : ${coveragePct}%</span>
+        </div>
+      `;
+      return dashboard;
+    }
+
+    // Rendu alternatif "Par propriété" : flatten bound entries across layers,
+    // groupe par property name, rend chaque property en section flat avec
+    // rows "[layer] → [pill]". Mixes bound + unbound entries under the same
+    // property heading — pill style (.variable-pill vs .unbound-variable)
+    // is the only visual differentiator. No more separate .danger section.
+    function renderByPropertyMode(container, msg, unboundMap) {
+      const { byLayer, layerInfoMap } = msg;
+
+      // Build a single property → entries map mixing bound + unbound.
+      // Each entry is { kind: 'bound' | 'unbound', ...payload }. Stable order:
+      // bound first (in original byLayer order), then unbound.
+      const byProp = {};
+      const propKey = (effectGroup, subProp, property) =>
+        effectGroup ? `${effectGroup} / ${subProp || property}` : property;
+
+      for (const layerKey of Object.keys(byLayer || {})) {
+        for (const entry of byLayer[layerKey] || []) {
+          const key = propKey(entry.effectGroup, entry.subProp, entry.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'bound', entry });
+        }
+      }
+      for (const layerName of Object.keys(unboundMap || {})) {
+        for (const u of unboundMap[layerName] || []) {
+          const key = propKey(u.effectGroup, u.subProp, u.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'unbound', entry: { ...u, layer: layerName } });
+        }
+      }
+
+      const propNames = Object.keys(byProp).sort();
+      if (propNames.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '2rem';
+        empty.style.textAlign = 'center';
+        empty.style.color = 'var(--fg-text-secondary)';
+        empty.textContent = 'Aucune propriété à afficher.';
+        container.appendChild(empty);
+        return;
+      }
+
+      for (const prop of propNames) {
+        const section = document.createElement('div');
+        section.className = 'property-section';
+        const h = document.createElement('h2');
+        h.textContent = `${prop} (${byProp[prop].length})`;
+        section.appendChild(h);
+        for (const row of byProp[prop]) {
+          const rowEl = document.createElement('div');
+          rowEl.className = 'property-row';
+
+          const layerLabel = document.createElement('span');
+          layerLabel.className = 'property-row-layer';
+          let layerId = '';
+          let layerText = '';
+          if (row.kind === 'bound') {
+            layerId = row.entry.layerId;
+            const li = layerInfoMap && layerInfoMap[layerId];
+            layerText = (li && li.name) || row.entry.layer;
+          } else {
+            layerText = row.entry.layer;
+            // Unbound entries don't carry layerId in unboundMap — resolve via
+            // first layerInfoMap entry whose name matches (best-effort).
+            if (layerInfoMap) {
+              for (const [id, info] of Object.entries(layerInfoMap)) {
+                if (info.name === layerText) { layerId = id; break; }
+              }
+            }
+          }
+          layerLabel.textContent = layerText;
+          if (layerId) {
+            layerLabel.style.cursor = 'pointer';
+            layerLabel.addEventListener('click', () => {
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: layerId } }, '*');
+            });
+          }
+          rowEl.appendChild(layerLabel);
+          rowEl.appendChild(document.createTextNode(' → '));
+
+          if (row.kind === 'bound') {
+            rowEl.appendChild(createVariablePill(row.entry));
+          } else {
+            const pill = document.createElement('span');
+            pill.className = 'variable-pill unbound-variable';
+            const v = document.createElement('span');
+            v.textContent = String(row.entry.value);
+            pill.appendChild(v);
+            rowEl.appendChild(pill);
+          }
+          section.appendChild(rowEl);
+        }
+        container.appendChild(section);
+      }
+    }
+
+    function handlePluginMessage(msg) {
+      if (!msg) return;
+
+      // Scan-start : ajoute la classe .scanning au bouton rescan pour
+      // afficher le spinner. Ne touche pas au reste du DOM — le contenu
+      // précédent reste affiché pendant le scan.
+      if (msg.type === 'scan-start') {
+        document.querySelectorAll('.fg-rescan').forEach(b => b.classList.add('scanning'));
+        return;
+      }
+
+      if (msg.type === 'error') {
+        const container = document.getElementById("app");
+        container.innerHTML = `<div style="padding:1rem;color:#b00;">Erreur: ${msg.message || 'inconnue'}</div>`;
+        return;
+      }
+
+      lastRender = msg;
+      let { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
+      // Dedup unbound entries within each layer name by
+      // (effectGroup, subProp, property, value) tuple. Multiple identical
+      // instances of a component (whether or not the plugin merged them via
+      // fingerprint) produce N copies of the same hardcoded property — show
+      // them once.
+      let unboundMap = {};
       if (unbound) {
+        const unboundSeen = {};
         unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
-          if (!unboundMap[layer]) unboundMap[layer] = [];
+          if (!unboundMap[layer]) {
+            unboundMap[layer] = [];
+            unboundSeen[layer] = new Set();
+          }
+          const key = `${effectGroup || ''}|${subProp || ''}|${property}|${value}`;
+          if (unboundSeen[layer].has(key)) return;
+          unboundSeen[layer].add(key);
           unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }
       const container = document.getElementById("app");
+
+      // Préserver focus + caret de l'input de recherche pendant le re-render.
+      // Sans ça, taper dans le search perd le focus à chaque debounce-fire
+      // (innerHTML="" détruit l'input, le nouveau démarre sans focus).
+      let restoreSearch = null;
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.classList && activeEl.classList.contains('fg-search')) {
+        restoreSearch = {
+          start: activeEl.selectionStart,
+          end: activeEl.selectionEnd,
+        };
+      }
+
       container.innerHTML = "";
+
+      // Toolbar (rescan button + futurs controls) — toujours rendu, même
+      // sur empty state, pour permettre à l'utilisateur de relancer un scan.
+      container.appendChild(renderToolbar());
+
+      if (restoreSearch) {
+        const newSearch = container.querySelector('.fg-search');
+        if (newSearch) {
+          newSearch.focus();
+          try { newSearch.setSelectionRange(restoreSearch.start, restoreSearch.end); } catch (_) { /* no-op */ }
+        }
+      }
 
       // Vérifier s'il n'y a aucune variable ni propriété non liée
       if (noVariablesFound) {
@@ -595,6 +1011,46 @@
           <p>Sélectionnez un élément avec des propriétés à inspecter.</p>
         `;
         container.appendChild(emptyMessage);
+        return;
+      }
+
+      // Dashboard de stats en tête de panneau (avant la liste des calques)
+      if (stats) {
+        container.appendChild(renderStats(stats));
+      }
+
+      // Applique search + filter chips avant tout rendu. Le state filter
+      // est lu une fois par render pour stabilité (sinon double-eval).
+      const filterState = getFilterState();
+      const filtered = applyFilters(byLayer, unboundMap, filterState);
+      byLayer = filtered.byLayer;
+      unboundMap = filtered.unboundMap;
+
+      const hasFilter = filterState.search.trim().length > 0
+        || filterState.types.length > 0
+        || filterState.origins.length > 0;
+      const noMatch = hasFilter
+        && Object.keys(byLayer).length === 0
+        && Object.keys(unboundMap).length === 0;
+      if (noMatch) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.style.cssText = 'padding:1rem;text-align:center;color:#666;';
+        empty.textContent = 'Aucun résultat ne correspond aux filtres.';
+        container.appendChild(empty);
+        return;
+      }
+
+      // Sort mode dispatch :
+      //  - 'unbound'    : layout byLayer mais sans les bound (byLayer = {})
+      //  - 'byProperty' : layout flat par property (bound + unbound mélangés)
+      //  - 'byLayer'    : flow historique ci-dessous (bound + unbound par calque)
+      const mode = getSortMode();
+      if (mode === 'unbound') {
+        byLayer = {};
+        // fall through to byLayer rendering loop; unboundMap drives layer-sections
+      } else if (mode === 'byProperty') {
+        renderByPropertyMode(container, { ...msg, byLayer }, unboundMap);
         return;
       }
 
@@ -701,13 +1157,38 @@
           title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
+          // Badge × N : prend les IDs du fingerprint-merge (layerInfo.mergedNodeIds)
+          // s'il existe, sinon retombe sur instancesByName[displayName] — qui
+          // compte les INSTANCE nodes partageant le même nom même quand leurs
+          // fingerprints diffèrent (boundVars/variants/copies).
+          const displayName = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
+          let cycleIds = (layerInfo && layerInfo.mergedNodeIds) || [];
+          if (cycleIds.length <= 1 && instancesByName && instancesByName[displayName]) {
+            cycleIds = instancesByName[displayName];
+          }
+          if (cycleIds.length > 1) {
+            const badge = document.createElement('span');
+            badge.className = 'merge-badge';
+            badge.textContent = `× ${cycleIds.length}`;
+            badge.title = 'Cliquer pour cycler entre les instances identiques';
+            badge.dataset.cycleIndex = '0';
+            badge.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              let idx = parseInt(badge.dataset.cycleIndex, 10) || 0;
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: cycleIds[idx] } }, '*');
+              idx = (idx + 1) % cycleIds.length;
+              badge.dataset.cycleIndex = String(idx);
+            });
+            hcontent.appendChild(badge);
+          }
+
           // Icône de sélection (SVG simple, remplace facilement)
           const selectIcon = document.createElement("span");
           selectIcon.className = "select-icon";
           selectIcon.innerHTML = `
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="black"/>
-              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="black"/>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="currentColor"/>
+              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="currentColor"/>
             </svg>
           `;
           selectIcon.title = "Sélectionner ce calque";
@@ -729,21 +1210,12 @@
           const normalUnboundItems = unboundSplit.normal;
           const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
 
-          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          // Propriétés non variabilisées (hors effets) : rendues inline dans
+          // la layer-section comme les bound rows. Plus de wrapper .danger —
+          // la pill .unbound-variable porte déjà l'identité rouge.
           if (normalUnboundItems && normalUnboundItems.length > 0) {
-            // Grouper aussi les propriétés non liées
             const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
-
-            const warn = document.createElement("div");
-            warn.className = "danger";
-            const wt = document.createElement("h3");
-            wt.appendChild(document.createTextNode("🚨 Non‑variabilisé"));
-            warn.appendChild(wt);
-
-            // Utiliser la fonction renderItemsList pour les éléments non liés
-            const ulWarn = renderItemsList(groupedUnboundItems, true);
-            warn.appendChild(ulWarn);
-            section.appendChild(warn);
+            section.appendChild(renderItemsList(groupedUnboundItems, true));
           }
 
           // Ajouter les variables liées s'il y en a (hors effets)
@@ -768,7 +1240,9 @@
           container.appendChild(section);
         }
       }
-    };
+    }
+
+    window.onmessage = (event) => handlePluginMessage(event.data.pluginMessage);
   </script>
 </body>
 

@@ -1,3 +1,80 @@
+:root {
+  --fg-accent: #0d99ff;
+  --fg-text: #1e1e1e;
+  --fg-text-secondary: #555555;
+  --fg-text-muted: #b3b3b3;
+  --fg-text-tertiary: #999999;
+  --fg-border: #e6e6e6;
+  --fg-divider: #eeeeee;
+  --fg-bg: #ffffff;
+  --fg-bg-soft: #f5f5f5;
+  --fg-bg-hover: #ebebeb;
+  --fg-radius: 6px;
+  --fg-radius-pill: 999px;
+
+  /* Semantic — variable origin */
+  --fg-local-bg: #e3f1ff;
+  --fg-local-fg: #1969d2;
+  --fg-external-bg: #eee8ff;
+  --fg-external-fg: #6451cf;
+
+  /* Semantic — danger / hardcoded properties */
+  --fg-danger-bg: #ffdcdc;
+  --fg-danger-fg: #8f0000;
+  --fg-danger-text: #b12020;
+  --fg-danger-border: #fdafaf;
+  --fg-danger-pill-bg: #fdb8b8;
+
+  /* Stats dashboard */
+  --fg-stats-bg: #f7fafd;
+  --fg-stats-border: #e0e8f0;
+  --fg-stats-bar: #e0e0e0;
+
+  /* Variable-path breadcrumb */
+  --fg-path-bg: #f7fafd;
+  --fg-path-border: #1969d2;
+  --fg-alias: #b06000;
+
+  /* Layer header tint */
+  --fg-header-bg: #e5f4ff;
+  --fg-ul-border: #e5f4ff;
+}
+
+html.figma-dark {
+  --fg-accent: #0d99ff;
+  --fg-text: #ffffff;
+  --fg-text-secondary: #cccccc;
+  --fg-text-muted: #999999;
+  --fg-text-tertiary: #777777;
+  --fg-border: #444444;
+  --fg-divider: #383838;
+  --fg-bg: #2c2c2c;
+  --fg-bg-soft: #383838;
+  --fg-bg-hover: #444444;
+
+  --fg-local-bg: #1c3a52;
+  --fg-local-fg: #64b6ff;
+  --fg-external-bg: #2d2440;
+  --fg-external-fg: #a99cf5;
+
+  --fg-danger-bg: #4a1f1f;
+  --fg-danger-fg: #ff8c8c;
+  --fg-danger-text: #ffaaaa;
+  --fg-danger-border: #6b2a2a;
+  --fg-danger-pill-bg: #5a2424;
+
+  --fg-stats-bg: #1f2a35;
+  --fg-stats-border: #2d3845;
+  --fg-stats-bar: #444444;
+
+  --fg-path-bg: #1f2a35;
+  --fg-path-border: #64b6ff;
+  --fg-alias: #ffb060;
+
+  --fg-header-bg: #1c3a52;
+  --fg-ul-border: #2d3845;
+}
+
 body {
   font-family: Inter, sans-serif;
   margin: 0;
@@ -7,6 +84,34 @@ body {
   box-sizing: border-box;
   overflow: auto;
   min-height: 200px;
+  background: var(--fg-bg);
+  color: var(--fg-text);
+  scrollbar-color: var(--fg-border) transparent;
+  scrollbar-width: thin;
+}
+
+/* Custom scrollbar — Figma-native thin, hover-revealed, themed via tokens. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fg-border);
+  border-radius: 5px;
+  border: 2px solid var(--fg-bg);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-text-muted);
+  background-clip: padding-box;
+  border: 2px solid var(--fg-bg);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 h2 {
@@ -17,7 +122,7 @@ h2 {
 
 ul {
   padding-left: 8px;
-  border-left: 1px solid #E5F4FF;
+  border-left: 1px solid var(--fg-ul-border);
 }
 
 li {
@@ -40,13 +145,13 @@ li {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
+  color: var(--fg-text-tertiary);
   transition: color 0.15s ease;
   z-index: 1000;
 }
 
 .resize-handle:hover {
-  color: #666;
+  color: var(--fg-text-secondary);
 }
 
 .resize-handle svg {
@@ -56,7 +161,7 @@ li {
 
 .layer-section {
   margin-bottom: 16px;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid var(--fg-border);
   padding-bottom: 16px;
   width: 100%;
 }
@@ -80,13 +185,13 @@ li {
 }
 
 .local-variable {
-  background-color: #e3f1ff;
-  color: #1969d2;
+  background-color: var(--fg-local-bg);
+  color: var(--fg-local-fg);
 }
 
 .external-variable {
-  background-color: #eee8ff;
-  color: #6451cf;
+  background-color: var(--fg-external-bg);
+  color: var(--fg-external-fg);
 }
 
 /* Styles pour les groupes de propriétés */
@@ -112,7 +217,7 @@ li {
 .property-sub-list .property-name {
   width: 100px;
   font-size: 0.75em;
-  color: #555;
+  color: var(--fg-text-secondary);
 }
 
 /* Styles pour les propriétés principales */
@@ -175,11 +280,11 @@ li {
 
 .property-name {
   font-weight: 600;
-  color: #333;
+  color: var(--fg-text);
 }
 
 .danger .property-name {
-  color: #8F0000;
+  color: var(--fg-danger-fg);
 }
 
 .danger .title-property-container {
@@ -195,7 +300,7 @@ li {
   justify-content: space-between;
   padding: 0.5em 0.75em;
   border-radius: 6px;
-  background: #E5F4FF;
+  background: var(--fg-header-bg);
   margin-bottom: 0.5em;
 }
 
@@ -212,14 +317,14 @@ li {
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: #666;
+  color: var(--fg-text-secondary);
   /* Couleur par défaut */
   transition: color 0.15s ease;
 }
 
 /* Couleur au survol pour donner un feedback visuel */
 .select-icon:hover {
-  color: #000;
+  color: var(--fg-text);
 }
 
 /* Icônes de type de calque */
@@ -229,7 +334,7 @@ li {
   height: 24px;
   margin-right: 4px;
   /* espace entre icône et titre */
-  color: #000;
+  color: var(--fg-text);
   /* couleur par défaut, remplaçable */
 }
 
@@ -240,26 +345,26 @@ li {
 }
 
 .danger {
-  background: #ffdcdc;
+  background: var(--fg-danger-bg);
   padding: 12px;
   margin-bottom: 1em;
   border-radius: 6px;
-  color: #B12020;
+  color: var(--fg-danger-text);
 }
 
 .danger h3 {
   margin-top: 0;
   font-size: 1rem;
   line-height: 1rem;
-  color: #8F0000;
+  color: var(--fg-danger-fg);
 }
 
 .danger ul {
-  border-left: 1px solid #fdafaf;
+  border-left: 1px solid var(--fg-danger-border);
 }
 .unbound-variable {
-  color: #8F0000;
-  background: #fdb8b8;
+  color: var(--fg-danger-fg);
+  background: var(--fg-danger-pill-bg);
   position: relative;
   padding-left: 32px;
 }
@@ -272,11 +377,17 @@ li {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: #8F0000;
+  color: var(--fg-danger-fg);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238F0000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+/* Dark-mode: re-embed the same warning SVG with a brighter stroke so it
+   stays legible on the deep-red --fg-danger-pill-bg (#5a2424). */
+html.figma-dark .unbound-variable::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ff8c8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
 }
 
 /* Effect-group sub-prop rows reuse property-container; the .danger modifier
@@ -302,17 +413,17 @@ li {
   margin-left: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #1969d2;
+  background: var(--fg-accent);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s ease;
+  transition: filter 0.15s ease;
 }
 
 .merge-badge:hover {
-  background: #1454ab;
+  filter: brightness(0.9);
 }
 
 .pill-wrapper {
@@ -323,10 +434,10 @@ li {
 .variable-path {
   margin-top: 4px;
   padding: 6px 10px;
-  background: #f7fafd;
-  border-left: 2px solid #1969d2;
+  background: var(--fg-path-bg);
+  border-left: 2px solid var(--fg-path-border);
   font-size: 11px;
-  color: #444;
+  color: var(--fg-text-secondary);
   border-radius: 0 4px 4px 0;
   animation: slide-down 150ms ease-out;
 }
@@ -337,7 +448,7 @@ li {
 }
 
 .alias-tag {
-  color: #b06000;
+  color: var(--fg-alias);
   font-style: italic;
   font-size: 10px;
   margin-left: 4px;
@@ -357,9 +468,9 @@ li {
 .toolbar {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--fg-bg);
   padding: 8px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--fg-divider);
   margin: -1rem -1rem 1rem -1rem;
   padding-left: 1rem;
   padding-right: 1rem;
@@ -372,28 +483,9 @@ li {
   justify-content: space-between;
 }
 
-.sort-toggle {
-  display: inline-flex;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.sort-toggle button {
-  background: #fff;
-  border: none;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  border-right: 1px solid #ccc;
-}
-
-.sort-toggle button:last-child { border-right: none; }
-.sort-toggle button.active { background: #1969d2; color: #fff; }
-
 .property-section {
   margin-bottom: 16px;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid var(--fg-border);
   padding-bottom: 12px;
 }
 
@@ -406,7 +498,7 @@ li {
 }
 
 .property-row-layer {
-  color: #1969d2;
+  color: var(--fg-accent);
 }
 
 .property-row-layer:hover { text-decoration: underline; }
@@ -414,21 +506,21 @@ li {
 .stats-dashboard {
   margin-bottom: 12px;
   padding: 8px 10px;
-  background: #f7fafd;
+  background: var(--fg-stats-bg);
   border-radius: 6px;
-  border: 1px solid #e0e8f0;
+  border: 1px solid var(--fg-stats-border);
 }
 
 .stats-line {
   font-size: 12px;
-  color: #444;
+  color: var(--fg-text-secondary);
   margin-bottom: 4px;
 }
 
 .stats-bar {
   position: relative;
   height: 8px;
-  background: #e0e0e0;
+  background: var(--fg-stats-bar);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 6px;
@@ -436,7 +528,7 @@ li {
 
 .stats-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #1969d2, #19a3d2);
+  background: linear-gradient(90deg, var(--fg-accent), #19a3d2);
   transition: width 0.3s ease;
 }
 
@@ -445,7 +537,7 @@ li {
   top: -16px;
   right: 0;
   font-size: 10px;
-  color: #666;
+  color: var(--fg-text-secondary);
 }
 
 .color-swatch {
@@ -464,83 +556,165 @@ li {
   background-position: 0 0, 0 3px, 3px -3px, -3px 0;
 }
 
-.rescan-btn {
-  background: transparent;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 16px;
-  color: #555;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.rescan-btn:hover {
-  color: #1969d2;
-  border-color: #1969d2;
-}
-
-.rescan-btn.scanning {
-  animation: spin 1s linear infinite;
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.search-input {
+.empty-state {
+  text-align: center;
+  color: var(--fg-text-tertiary);
+  padding: 2rem 1rem;
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   Figma UI3 toolbar — replaces the legacy .search-input / .rescan-btn /
+   .sort-toggle / .filter-row / .chip rules. The legacy rules are removed
+   in a follow-up commit once renderToolbar() emits the new markup.
+   ========================================================================== */
+
+.fg-search {
   flex: 1;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-right: 8px;
+  height: 28px;
+  padding: 0 8px 0 26px;
+  border: 1px solid transparent;
+  border-radius: var(--fg-radius);
+  background: var(--fg-bg-soft) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 8px center;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background-color 0.1s, border-color 0.1s;
 }
-
-.search-input:focus {
+.fg-search::placeholder { color: var(--fg-text-muted); }
+.fg-search:focus {
   outline: none;
-  border-color: #1969d2;
+  background-color: var(--fg-bg);
+  border-color: var(--fg-accent);
 }
 
-.filter-row {
+.fg-ghost {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-text);
+  transition: background 0.1s;
+}
+.fg-ghost:hover { background: var(--fg-bg-soft); }
+.fg-ghost svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.fg-rescan.scanning svg { animation: spin 1s linear infinite; }
+
+.fg-seg {
+  display: inline-flex;
+  background: var(--fg-bg-soft);
+  border-radius: var(--fg-radius);
+  padding: 2px;
+}
+.fg-seg button {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--fg-text);
+  font-family: inherit;
+  font-weight: 400;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.fg-seg button.active {
+  background: var(--fg-bg);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.fg-filter-btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background 0.1s;
+}
+.fg-filter-btn:hover { background: var(--fg-bg-soft); }
+.fg-filter-btn .fg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--fg-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+.fg-filter-btn .fg-caret {
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.fg-filter-btn[data-expanded="true"] .fg-caret { transform: rotate(180deg); }
+
+.fg-filters {
+  margin-top: 6px;
+  padding: 6px 0 2px 0;
+}
+.fg-frow {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
   flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.fg-frow:last-child { margin-bottom: 0; }
+.fg-flabel {
+  font-size: 10px;
+  color: var(--fg-text-muted);
+  min-width: 44px;
+  font-weight: 500;
 }
 
-.filter-label {
-  color: #666;
-  margin-right: 4px;
-}
-
-.chip {
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+.fg-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: none;
+  border-radius: var(--fg-radius-pill);
+  background: var(--fg-bg-soft);
+  font-size: 10px;
+  color: var(--fg-text);
   cursor: pointer;
-  color: #555;
-  transition: all 0.15s;
+  font-family: inherit;
+  font-weight: 400;
+  transition: background 0.1s, color 0.1s;
 }
-
-.chip:hover {
-  border-color: #1969d2;
-  color: #1969d2;
-}
-
-.chip.active {
-  background: #1969d2;
+.fg-chip:hover { background: var(--fg-bg-hover); }
+.fg-chip.active {
+  background: var(--fg-accent);
   color: #fff;
-  border-color: #1969d2;
-}
-
-.empty-state {
-  text-align: center;
-  color: #999;
-  padding: 2rem 1rem;
-  font-size: 14px;
 }

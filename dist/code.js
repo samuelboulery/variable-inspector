@@ -1,4 +1,4 @@
-const q=`<!DOCTYPE html>
+const X=`<!DOCTYPE html>
 <html>
 
 <head>
@@ -15,6 +15,17 @@ const q=`<!DOCTYPE html>
     </svg>
   </div>
   <script>
+    // Surfaçage des erreurs runtime — sinon le panneau Figma reste blanc
+    // sans aucun feedback. Affiche l'erreur dans le DOM directement.
+    window.addEventListener('error', (ev) => {
+      const app = document.getElementById('app');
+      if (!app) return;
+      const errBox = document.createElement('div');
+      errBox.style.cssText = 'padding:1rem;background:#fee;color:#900;font:12px monospace;white-space:pre-wrap;';
+      errBox.textContent = \`JS error: \${ev.message}\\nat \${ev.filename}:\${ev.lineno}:\${ev.colno}\`;
+      app.appendChild(errBox);
+    });
+
     // Gestion du redimensionnement
     const resizeHandle = document.querySelector('.resize-handle');
     let isResizing = false;
@@ -142,10 +153,96 @@ const q=`<!DOCTYPE html>
       'Background Blur': '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.6053 4.01333C18.2621 4.08068 18.8706 4.38929 19.313 4.87944C19.7553 5.36959 20.0001 6.00642 20 6.66667V17.3333L19.9867 17.6053C19.9239 18.2154 19.6528 18.7851 19.2191 19.2187C18.7853 19.6522 18.2154 19.9229 17.6053 19.9853L17.3333 20H6.66667L6.39467 19.9867C5.78463 19.9239 5.21486 19.6528 4.78135 19.2191C4.34783 18.7853 4.07707 18.2154 4.01467 17.6053L4 17.3333V6.66667C3.99986 6.00642 4.24466 5.36959 4.68702 4.87944C5.12939 4.38929 5.73786 4.08068 6.39467 4.01333L6.66667 4H17.3333L17.6053 4.01333ZM6.66667 5.33333C6.31304 5.33333 5.97391 5.47381 5.72386 5.72386C5.47381 5.97391 5.33333 6.31304 5.33333 6.66667V17.3333C5.33333 17.687 5.47381 18.0261 5.72386 18.2761C5.97391 18.5262 6.31304 18.6667 6.66667 18.6667H17.3333C17.687 18.6667 18.0261 18.5262 18.2761 18.2761C18.5262 18.0261 18.6667 17.687 18.6667 17.3333V6.66667C18.6667 6.31304 18.5262 5.97391 18.2761 5.72386C18.0261 5.47381 17.687 5.33333 17.3333 5.33333H6.66667ZM12 15C12.2652 15 12.5196 15.1054 12.7071 15.2929C12.8946 15.4804 13 15.7348 13 16C13 16.2652 12.8946 16.5196 12.7071 16.7071C12.5196 16.8946 12.2652 17 12 17C11.7348 17 11.4804 16.8946 11.2929 16.7071C11.1054 16.5196 11 16.2652 11 16C11 15.7348 11.1054 15.4804 11.2929 15.2929C11.4804 15.1054 11.7348 15 12 15ZM8 15.3333C8.17681 15.3333 8.34638 15.4036 8.47141 15.5286C8.59643 15.6536 8.66667 15.8232 8.66667 16C8.66667 16.1768 8.59643 16.3464 8.47141 16.4714C8.34638 16.5964 8.17681 16.6667 8 16.6667C7.82319 16.6667 7.65362 16.5964 7.5286 16.4714C7.40357 16.3464 7.33333 16.1768 7.33333 16C7.33333 15.8232 7.40357 15.6536 7.5286 15.5286C7.65362 15.4036 7.82319 15.3333 8 15.3333ZM16 15.3333C16.1768 15.3333 16.3464 15.4036 16.4714 15.5286C16.5964 15.6536 16.6667 15.8232 16.6667 16C16.6667 16.1768 16.5964 16.3464 16.4714 16.4714C16.3464 16.5964 16.1768 16.6667 16 16.6667C15.8232 16.6667 15.6536 16.5964 15.5286 16.4714C15.4036 16.3464 15.3333 16.1768 15.3333 16C15.3333 15.8232 15.4036 15.6536 15.5286 15.5286C15.6536 15.4036 15.8232 15.3333 16 15.3333ZM12 10.6667C12.3536 10.6667 12.6928 10.8071 12.9428 11.0572C13.1929 11.3072 13.3333 11.6464 13.3333 12C13.3333 12.3536 13.1929 12.6928 12.9428 12.9428C12.6928 13.1929 12.3536 13.3333 12 13.3333C11.6464 13.3333 11.3072 13.1929 11.0572 12.9428C10.8071 12.6928 10.6667 12.3536 10.6667 12C10.6667 11.6464 10.8071 11.3072 11.0572 11.0572C11.3072 10.8071 11.6464 10.6667 12 10.6667ZM8 11C8.26522 11 8.51957 11.1054 8.70711 11.2929C8.89464 11.4804 9 11.7348 9 12C9 12.2652 8.89464 12.5196 8.70711 12.7071C8.51957 12.8946 8.26522 13 8 13C7.73478 13 7.48043 12.8946 7.29289 12.7071C7.10536 12.5196 7 12.2652 7 12C7 11.7348 7.10536 11.4804 7.29289 11.2929C7.48043 11.1054 7.73478 11 8 11ZM16 11C16.2652 11 16.5196 11.1054 16.7071 11.2929C16.8946 11.4804 17 11.7348 17 12C17 12.2652 16.8946 12.5196 16.7071 12.7071C16.5196 12.8946 16.2652 13 16 13C15.7348 13 15.4804 12.8946 15.2929 12.7071C15.1054 12.5196 15 12.2652 15 12C15 11.7348 15.1054 11.4804 15.2929 11.2929C15.4804 11.1054 15.7348 11 16 11ZM12 7C12.2652 7 12.5196 7.10536 12.7071 7.29289C12.8946 7.48043 13 7.73478 13 8C13 8.26522 12.8946 8.51957 12.7071 8.70711C12.5196 8.89464 12.2652 9 12 9C11.7348 9 11.4804 8.89464 11.2929 8.70711C11.1054 8.51957 11 8.26522 11 8C11 7.73478 11.1054 7.48043 11.2929 7.29289C11.4804 7.10536 11.7348 7 12 7ZM8 7.33333C8.17681 7.33333 8.34638 7.40357 8.47141 7.5286C8.59643 7.65362 8.66667 7.82319 8.66667 8C8.66667 8.17681 8.59643 8.34638 8.47141 8.47141C8.34638 8.59643 8.17681 8.66667 8 8.66667C7.82319 8.66667 7.65362 8.59643 7.5286 8.47141C7.40357 8.34638 7.33333 8.17681 7.33333 8C7.33333 7.82319 7.40357 7.65362 7.5286 7.5286C7.65362 7.40357 7.82319 7.33333 8 7.33333ZM16 7.33333C16.1768 7.33333 16.3464 7.40357 16.4714 7.5286C16.5964 7.65362 16.6667 7.82319 16.6667 8C16.6667 8.17681 16.5964 8.34638 16.4714 8.47141C16.3464 8.59643 16.1768 8.66667 16 8.66667C15.8232 8.66667 15.6536 8.59643 15.5286 8.47141C15.4036 8.34638 15.3333 8.17681 15.3333 8C15.3333 7.82319 15.4036 7.65362 15.5286 7.5286C15.6536 7.40357 15.8232 7.33333 16 7.33333Z" fill="currentColor"/></svg>'
     };
 
-    // Fonction pour créer le pill d'une variable
+    // Persistence locale (Features F.2 + G.6). Figma sert l'UI via une data:
+    // URL, qui désactive localStorage — try/catch + fallback in-memory.
+    const SORT_KEY = 'vi.sortMode';
+    const SEARCH_KEY = 'vi.search';
+    const FILTER_TYPES_KEY = 'vi.filter.types';
+    const FILTER_ORIGINS_KEY = 'vi.filter.origins';
+
+    let sortModeMemory = 'byLayer';
+    let filterMemory = { search: '', types: [], origins: [] };
+
+    function getSortMode() {
+      try {
+        const v = localStorage.getItem(SORT_KEY);
+        if (v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
+      } catch (_) { /* data: URL — fallback below */ }
+      return sortModeMemory;
+    }
+    function setSortMode(mode) {
+      sortModeMemory = mode;
+      try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
+    }
+
+    function getFilterState() {
+      try {
+        const types = JSON.parse(localStorage.getItem(FILTER_TYPES_KEY) || '[]');
+        const origins = JSON.parse(localStorage.getItem(FILTER_ORIGINS_KEY) || '[]');
+        return {
+          search: localStorage.getItem(SEARCH_KEY) || '',
+          types: Array.isArray(types) ? types : [],
+          origins: Array.isArray(origins) ? origins : [],
+        };
+      } catch (_) {
+        return { search: filterMemory.search, types: [...filterMemory.types], origins: [...filterMemory.origins] };
+      }
+    }
+    function setFilterState(filter) {
+      filterMemory = { search: filter.search, types: [...filter.types], origins: [...filter.origins] };
+      try {
+        localStorage.setItem(SEARCH_KEY, filter.search);
+        localStorage.setItem(FILTER_TYPES_KEY, JSON.stringify(filter.types));
+        localStorage.setItem(FILTER_ORIGINS_KEY, JSON.stringify(filter.origins));
+      } catch (_) { /* no-op */ }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Cache du dernier message render pour re-render après toggle sort/filter
+    let lastRender = null;
+    let filtersExpanded = false;
+
+    // Singleton: pill actuellement ouvert (single-open semantics)
+    let openPathBox = null;
+
+    // Construit le breadcrumb du chemin de résolution d'une variable
+    function buildPathBreadcrumb(path) {
+      const root = document.createElement('div');
+      root.className = 'path-content';
+      const parts = [];
+      if (path.library) parts.push(path.library);
+      parts.push(path.collection);
+      for (const g of path.groups) parts.push(g);
+      parts.push(path.name);
+      root.textContent = '└─ ' + parts.join(' / ');
+      if (path.isAlias) {
+        const aliasTag = document.createElement('span');
+        aliasTag.className = 'alias-tag';
+        aliasTag.textContent = ' (alias)';
+        root.appendChild(aliasTag);
+      }
+      return root;
+    }
+
+    // Fonction pour créer le pill d'une variable (avec wrapper pour breadcrumb path)
     function createVariablePill(item) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pill-wrapper';
+
       const pill = document.createElement("span");
       pill.className = \`variable-pill \${item.origin}-variable\`;
+      pill.style.cursor = item.path ? 'pointer' : 'default';
+
+      // Color swatch pour les variables COLOR
+      if (item.type === 'COLOR' && item.colorValue) {
+        const swatch = document.createElement('span');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = formatRGBA(item.colorValue);
+        pill.appendChild(swatch);
+      }
 
       // Ajouter l'icône de type de variable
       const typeIcon = createVariableTypeIconElement(item.type);
@@ -158,7 +255,26 @@ const q=`<!DOCTYPE html>
       nameSpan.textContent = item.name;
       pill.appendChild(nameSpan);
 
-      return pill;
+      wrapper.appendChild(pill);
+
+      if (item.path) {
+        const pathBox = document.createElement('div');
+        pathBox.className = 'variable-path';
+        pathBox.style.display = 'none';
+        pathBox.appendChild(buildPathBreadcrumb(item.path));
+        wrapper.appendChild(pathBox);
+
+        pill.addEventListener('click', () => {
+          const isOpen = pathBox.style.display === 'block';
+          if (openPathBox && openPathBox !== pathBox) {
+            openPathBox.style.display = 'none';
+          }
+          pathBox.style.display = isOpen ? 'none' : 'block';
+          openPathBox = isOpen ? null : pathBox;
+        });
+      }
+
+      return wrapper;
     }
 
     // Fonction pour créer un élément d'icône de propriété à partir de propertyIcons (réutilisable)
@@ -569,19 +685,319 @@ const q=`<!DOCTYPE html>
       return ul;
     }
 
-    // --- window.onmessage handler moved below all definitions ---
-    window.onmessage = (event) => {
-      const msg = event.data.pluginMessage;
-      const { byLayer, unbound, layerInfoMap, noVariablesFound } = msg;
-      const unboundMap = {};
+    // Construit la toolbar (rescan + search + sort toggle + filter chips).
+    // Toutes les actions re-invoquent handlePluginMessage(lastRender) sans
+    // re-scan plugin-side, sauf le rescan (⟳) qui poste 'rescan'.
+    function renderToolbar() {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'toolbar';
+      const filter = getFilterState();
+      const activeFilterCount = filter.types.length + filter.origins.length;
+      const expanded = filtersExpanded;
+      toolbar.innerHTML = \`
+        <div class="toolbar-row">
+          <input class="fg-search" type="text" placeholder="Rechercher" value="\${escapeHtml(filter.search)}" />
+          <button class="fg-ghost fg-rescan" title="Re-scan selection" aria-label="Re-scan">
+            <svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+        <div class="toolbar-row">
+          <div class="fg-seg">
+            <button data-mode="byLayer">Calque</button>
+            <button data-mode="byProperty">Propriété</button>
+            <button data-mode="unbound">Unbound</button>
+          </div>
+          <span style="flex:1"></span>
+          <button class="fg-filter-btn" data-expanded="\${expanded ? 'true' : 'false'}" aria-expanded="\${expanded ? 'true' : 'false'}">
+            Filtres\${activeFilterCount > 0 ? \` <span class="fg-badge">\${activeFilterCount}</span>\` : ''}
+            <svg class="fg-caret" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        \${expanded ? \`
+        <div class="fg-filters">
+          <div class="fg-frow">
+            <span class="fg-flabel">Type</span>
+            <button class="fg-chip" data-filter="type" data-value="COLOR">Color</button>
+            <button class="fg-chip" data-filter="type" data-value="FLOAT">Float</button>
+            <button class="fg-chip" data-filter="type" data-value="STRING">String</button>
+            <button class="fg-chip" data-filter="type" data-value="BOOLEAN">Bool</button>
+          </div>
+          <div class="fg-frow">
+            <span class="fg-flabel">Origine</span>
+            <button class="fg-chip" data-filter="origin" data-value="local">Local</button>
+            <button class="fg-chip" data-filter="origin" data-value="external">External</button>
+          </div>
+        </div>\` : ''}
+      \`;
+
+      toolbar.querySelector('.fg-rescan').addEventListener('click', () => {
+        parent.postMessage({ pluginMessage: { type: 'rescan' } }, '*');
+      });
+
+      const currentSort = getSortMode();
+      toolbar.querySelectorAll('.fg-seg button').forEach(btn => {
+        if (btn.dataset.mode === currentSort) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          if (btn.dataset.mode === getSortMode()) return;
+          setSortMode(btn.dataset.mode);
+          if (lastRender) handlePluginMessage(lastRender);
+        });
+      });
+
+      toolbar.querySelector('.fg-filter-btn').addEventListener('click', () => {
+        filtersExpanded = !filtersExpanded;
+        if (lastRender) handlePluginMessage(lastRender);
+      });
+
+      toolbar.querySelectorAll('.fg-chip').forEach(chip => {
+        const f = chip.dataset.filter;
+        const v = chip.dataset.value;
+        const arr = f === 'type' ? filter.types : filter.origins;
+        if (arr.includes(v)) chip.classList.add('active');
+        chip.addEventListener('click', () => {
+          const cur = getFilterState();
+          const target = f === 'type' ? cur.types : cur.origins;
+          const idx = target.indexOf(v);
+          if (idx >= 0) target.splice(idx, 1); else target.push(v);
+          setFilterState(cur);
+          if (lastRender) handlePluginMessage(lastRender);
+        });
+      });
+
+      let searchTimer = null;
+      const searchInput = toolbar.querySelector('.fg-search');
+      searchInput.addEventListener('input', (ev) => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const cur = getFilterState();
+          cur.search = ev.target.value;
+          setFilterState(cur);
+          if (lastRender) handlePluginMessage(lastRender);
+        }, 150);
+      });
+
+      return toolbar;
+    }
+
+    // Applique le filter state (search + types + origins) à une entrée bound.
+    function matchesFilter(entry, filter) {
+      const q = (filter.search || '').trim().toLowerCase();
+      if (q) {
+        const hay = \`\${entry.layer || ''} \${entry.property || ''} \${entry.name || ''}\`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filter.types.length > 0 && !filter.types.includes(entry.type)) return false;
+      if (filter.origins.length > 0 && !filter.origins.includes(entry.origin)) return false;
+      return true;
+    }
+
+    // Applique le filter state à une entry unbound. Les unbound n'ont pas de
+    // type/origin (toujours hardcodé) — on ne filtre que par search sur layer
+    // + property + value. Les chips type/origin actifs masquent les unbound.
+    function matchesFilterUnbound(layer, item, filter) {
+      if (filter.types.length > 0 || filter.origins.length > 0) return false;
+      const q = (filter.search || '').trim().toLowerCase();
+      if (!q) return true;
+      const hay = \`\${layer || ''} \${item.property || ''} \${String(item.value || '')}\`.toLowerCase();
+      return hay.includes(q);
+    }
+
+    // Filtre byLayer + unboundMap en place et retourne de nouveaux objets.
+    function applyFilters(byLayer, unboundMap, filter) {
+      const fByLayer = {};
+      for (const k of Object.keys(byLayer || {})) {
+        const kept = (byLayer[k] || []).filter(e => matchesFilter(e, filter));
+        if (kept.length > 0) fByLayer[k] = kept;
+      }
+      const fUnbound = {};
+      for (const layer of Object.keys(unboundMap || {})) {
+        const kept = (unboundMap[layer] || []).filter(it => matchesFilterUnbound(layer, it, filter));
+        if (kept.length > 0) fUnbound[layer] = kept;
+      }
+      return { byLayer: fByLayer, unboundMap: fUnbound };
+    }
+
+    // Construit le dashboard de stats affiché au-dessus des layer-sections
+    function renderStats(stats) {
+      const dashboard = document.createElement('div');
+      dashboard.className = 'stats-dashboard';
+      const coveragePct = Math.round(stats.variableCoverage * 100);
+      dashboard.innerHTML = \`
+        <div class="stats-line">
+          <strong>\${stats.totalVariables}</strong> variables
+          • <strong>\${stats.totalHardcoded}</strong> hardcoded (\${100 - coveragePct}%)
+        </div>
+        <div class="stats-line">
+          <strong>\${stats.byOrigin.local}</strong> local • <strong>\${stats.byOrigin.external}</strong> external
+        </div>
+        <div class="stats-bar">
+          <div class="stats-bar-fill" style="width: \${coveragePct}%"></div>
+          <span class="stats-bar-label">Coverage : \${coveragePct}%</span>
+        </div>
+      \`;
+      return dashboard;
+    }
+
+    // Rendu alternatif "Par propriété" : flatten bound entries across layers,
+    // groupe par property name, rend chaque property en section flat avec
+    // rows "[layer] → [pill]". Mixes bound + unbound entries under the same
+    // property heading — pill style (.variable-pill vs .unbound-variable)
+    // is the only visual differentiator. No more separate .danger section.
+    function renderByPropertyMode(container, msg, unboundMap) {
+      const { byLayer, layerInfoMap } = msg;
+
+      // Build a single property → entries map mixing bound + unbound.
+      // Each entry is { kind: 'bound' | 'unbound', ...payload }. Stable order:
+      // bound first (in original byLayer order), then unbound.
+      const byProp = {};
+      const propKey = (effectGroup, subProp, property) =>
+        effectGroup ? \`\${effectGroup} / \${subProp || property}\` : property;
+
+      for (const layerKey of Object.keys(byLayer || {})) {
+        for (const entry of byLayer[layerKey] || []) {
+          const key = propKey(entry.effectGroup, entry.subProp, entry.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'bound', entry });
+        }
+      }
+      for (const layerName of Object.keys(unboundMap || {})) {
+        for (const u of unboundMap[layerName] || []) {
+          const key = propKey(u.effectGroup, u.subProp, u.property);
+          if (!byProp[key]) byProp[key] = [];
+          byProp[key].push({ kind: 'unbound', entry: { ...u, layer: layerName } });
+        }
+      }
+
+      const propNames = Object.keys(byProp).sort();
+      if (propNames.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '2rem';
+        empty.style.textAlign = 'center';
+        empty.style.color = 'var(--fg-text-secondary)';
+        empty.textContent = 'Aucune propriété à afficher.';
+        container.appendChild(empty);
+        return;
+      }
+
+      for (const prop of propNames) {
+        const section = document.createElement('div');
+        section.className = 'property-section';
+        const h = document.createElement('h2');
+        h.textContent = \`\${prop} (\${byProp[prop].length})\`;
+        section.appendChild(h);
+        for (const row of byProp[prop]) {
+          const rowEl = document.createElement('div');
+          rowEl.className = 'property-row';
+
+          const layerLabel = document.createElement('span');
+          layerLabel.className = 'property-row-layer';
+          let layerId = '';
+          let layerText = '';
+          if (row.kind === 'bound') {
+            layerId = row.entry.layerId;
+            const li = layerInfoMap && layerInfoMap[layerId];
+            layerText = (li && li.name) || row.entry.layer;
+          } else {
+            layerText = row.entry.layer;
+            // Unbound entries don't carry layerId in unboundMap — resolve via
+            // first layerInfoMap entry whose name matches (best-effort).
+            if (layerInfoMap) {
+              for (const [id, info] of Object.entries(layerInfoMap)) {
+                if (info.name === layerText) { layerId = id; break; }
+              }
+            }
+          }
+          layerLabel.textContent = layerText;
+          if (layerId) {
+            layerLabel.style.cursor = 'pointer';
+            layerLabel.addEventListener('click', () => {
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: layerId } }, '*');
+            });
+          }
+          rowEl.appendChild(layerLabel);
+          rowEl.appendChild(document.createTextNode(' → '));
+
+          if (row.kind === 'bound') {
+            rowEl.appendChild(createVariablePill(row.entry));
+          } else {
+            const pill = document.createElement('span');
+            pill.className = 'variable-pill unbound-variable';
+            const v = document.createElement('span');
+            v.textContent = String(row.entry.value);
+            pill.appendChild(v);
+            rowEl.appendChild(pill);
+          }
+          section.appendChild(rowEl);
+        }
+        container.appendChild(section);
+      }
+    }
+
+    function handlePluginMessage(msg) {
+      if (!msg) return;
+
+      // Scan-start : ajoute la classe .scanning au bouton rescan pour
+      // afficher le spinner. Ne touche pas au reste du DOM — le contenu
+      // précédent reste affiché pendant le scan.
+      if (msg.type === 'scan-start') {
+        document.querySelectorAll('.fg-rescan').forEach(b => b.classList.add('scanning'));
+        return;
+      }
+
+      if (msg.type === 'error') {
+        const container = document.getElementById("app");
+        container.innerHTML = \`<div style="padding:1rem;color:#b00;">Erreur: \${msg.message || 'inconnue'}</div>\`;
+        return;
+      }
+
+      lastRender = msg;
+      let { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
+      // Dedup unbound entries within each layer name by
+      // (effectGroup, subProp, property, value) tuple. Multiple identical
+      // instances of a component (whether or not the plugin merged them via
+      // fingerprint) produce N copies of the same hardcoded property — show
+      // them once.
+      let unboundMap = {};
       if (unbound) {
+        const unboundSeen = {};
         unbound.forEach(({ layer, property, value, effectGroup, subProp }) => {
-          if (!unboundMap[layer]) unboundMap[layer] = [];
+          if (!unboundMap[layer]) {
+            unboundMap[layer] = [];
+            unboundSeen[layer] = new Set();
+          }
+          const key = \`\${effectGroup || ''}|\${subProp || ''}|\${property}|\${value}\`;
+          if (unboundSeen[layer].has(key)) return;
+          unboundSeen[layer].add(key);
           unboundMap[layer].push({ property, value, effectGroup, subProp });
         });
       }
       const container = document.getElementById("app");
+
+      // Préserver focus + caret de l'input de recherche pendant le re-render.
+      // Sans ça, taper dans le search perd le focus à chaque debounce-fire
+      // (innerHTML="" détruit l'input, le nouveau démarre sans focus).
+      let restoreSearch = null;
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.classList && activeEl.classList.contains('fg-search')) {
+        restoreSearch = {
+          start: activeEl.selectionStart,
+          end: activeEl.selectionEnd,
+        };
+      }
+
       container.innerHTML = "";
+
+      // Toolbar (rescan button + futurs controls) — toujours rendu, même
+      // sur empty state, pour permettre à l'utilisateur de relancer un scan.
+      container.appendChild(renderToolbar());
+
+      if (restoreSearch) {
+        const newSearch = container.querySelector('.fg-search');
+        if (newSearch) {
+          newSearch.focus();
+          try { newSearch.setSelectionRange(restoreSearch.start, restoreSearch.end); } catch (_) { /* no-op */ }
+        }
+      }
 
       // Vérifier s'il n'y a aucune variable ni propriété non liée
       if (noVariablesFound) {
@@ -595,6 +1011,46 @@ const q=`<!DOCTYPE html>
           <p>Sélectionnez un élément avec des propriétés à inspecter.</p>
         \`;
         container.appendChild(emptyMessage);
+        return;
+      }
+
+      // Dashboard de stats en tête de panneau (avant la liste des calques)
+      if (stats) {
+        container.appendChild(renderStats(stats));
+      }
+
+      // Applique search + filter chips avant tout rendu. Le state filter
+      // est lu une fois par render pour stabilité (sinon double-eval).
+      const filterState = getFilterState();
+      const filtered = applyFilters(byLayer, unboundMap, filterState);
+      byLayer = filtered.byLayer;
+      unboundMap = filtered.unboundMap;
+
+      const hasFilter = filterState.search.trim().length > 0
+        || filterState.types.length > 0
+        || filterState.origins.length > 0;
+      const noMatch = hasFilter
+        && Object.keys(byLayer).length === 0
+        && Object.keys(unboundMap).length === 0;
+      if (noMatch) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.style.cssText = 'padding:1rem;text-align:center;color:#666;';
+        empty.textContent = 'Aucun résultat ne correspond aux filtres.';
+        container.appendChild(empty);
+        return;
+      }
+
+      // Sort mode dispatch :
+      //  - 'unbound'    : layout byLayer mais sans les bound (byLayer = {})
+      //  - 'byProperty' : layout flat par property (bound + unbound mélangés)
+      //  - 'byLayer'    : flow historique ci-dessous (bound + unbound par calque)
+      const mode = getSortMode();
+      if (mode === 'unbound') {
+        byLayer = {};
+        // fall through to byLayer rendering loop; unboundMap drives layer-sections
+      } else if (mode === 'byProperty') {
+        renderByPropertyMode(container, { ...msg, byLayer }, unboundMap);
         return;
       }
 
@@ -701,13 +1157,38 @@ const q=`<!DOCTYPE html>
           title.textContent = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
           hcontent.appendChild(title);
 
+          // Badge × N : prend les IDs du fingerprint-merge (layerInfo.mergedNodeIds)
+          // s'il existe, sinon retombe sur instancesByName[displayName] — qui
+          // compte les INSTANCE nodes partageant le même nom même quand leurs
+          // fingerprints diffèrent (boundVars/variants/copies).
+          const displayName = (layerInfo && layerInfo.name) ? layerInfo.name : layerName;
+          let cycleIds = (layerInfo && layerInfo.mergedNodeIds) || [];
+          if (cycleIds.length <= 1 && instancesByName && instancesByName[displayName]) {
+            cycleIds = instancesByName[displayName];
+          }
+          if (cycleIds.length > 1) {
+            const badge = document.createElement('span');
+            badge.className = 'merge-badge';
+            badge.textContent = \`× \${cycleIds.length}\`;
+            badge.title = 'Cliquer pour cycler entre les instances identiques';
+            badge.dataset.cycleIndex = '0';
+            badge.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              let idx = parseInt(badge.dataset.cycleIndex, 10) || 0;
+              parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: cycleIds[idx] } }, '*');
+              idx = (idx + 1) % cycleIds.length;
+              badge.dataset.cycleIndex = String(idx);
+            });
+            hcontent.appendChild(badge);
+          }
+
           // Icône de sélection (SVG simple, remplace facilement)
           const selectIcon = document.createElement("span");
           selectIcon.className = "select-icon";
           selectIcon.innerHTML = \`
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="black"/>
-              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="black"/>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 18.8571C13.8186 18.8571 15.5628 18.1347 16.8487 16.8487C18.1347 15.5628 18.8571 13.8186 18.8571 12C18.8571 10.1814 18.1347 8.43723 16.8487 7.15127C15.5628 5.8653 13.8186 5.14286 12 5.14286C10.1814 5.14286 8.43723 5.8653 7.15127 7.15127C5.8653 8.43723 5.14286 10.1814 5.14286 12C5.14286 13.8186 5.8653 15.5628 7.15127 16.8487C8.43723 18.1347 10.1814 18.8571 12 18.8571ZM12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20ZM12 15.4286C12.9093 15.4286 13.7814 15.0673 14.4244 14.4244C15.0673 13.7814 15.4286 12.9093 15.4286 12C15.4286 11.0907 15.0673 10.2186 14.4244 9.57563C13.7814 8.93265 12.9093 8.57143 12 8.57143C11.0907 8.57143 10.2186 8.93265 9.57563 9.57563C8.93265 10.2186 8.57143 11.0907 8.57143 12C8.57143 12.9093 8.93265 13.7814 9.57563 14.4244C10.2186 15.0673 11.0907 15.4286 12 15.4286ZM12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714ZM13.1429 12C13.1429 12.3031 13.0224 12.5938 12.8081 12.8081C12.5938 13.0224 12.3031 13.1429 12 13.1429C11.6969 13.1429 11.4062 13.0224 11.1919 12.8081C10.9776 12.5938 10.8571 12.3031 10.8571 12C10.8571 11.6969 10.9776 11.4062 11.1919 11.1919C11.4062 10.9776 11.6969 10.8571 12 10.8571C12.3031 10.8571 12.5938 10.9776 12.8081 11.1919C13.0224 11.4062 13.1429 11.6969 13.1429 12Z" fill="currentColor"/>
+              <path d="M12.3984 3.91016C13.326 3.95584 14.2398 4.16047 15.0996 4.5166C16.0823 4.92366 16.9754 5.52031 17.7275 6.27246C18.4797 7.02462 19.0763 7.91765 19.4834 8.90039C19.8904 9.8831 20.0996 10.9363 20.0996 12C20.0996 13.0637 19.8904 14.1169 19.4834 15.0996C19.0763 16.0823 18.4797 16.9754 17.7275 17.7275C16.9754 18.4797 16.0823 19.0763 15.0996 19.4834C14.1169 19.8904 13.0637 20.0996 12 20.0996C9.85175 20.0996 7.79151 19.2466 6.27246 17.7275C4.75342 16.2085 3.90039 14.1483 3.90039 12C3.90039 9.85175 4.75342 7.79151 6.27246 6.27246C7.79151 4.75342 9.85175 3.90039 12 3.90039L12.3984 3.91016ZM12 4C9.87827 4 7.84344 4.84285 6.34315 6.34315C4.84285 7.84344 4 9.87827 4 12C4 14.1217 4.84285 16.1566 6.34315 17.6569C7.84344 19.1571 9.87827 20 12 20C13.0506 20 14.0909 19.7931 15.0615 19.391C16.0321 18.989 16.914 18.3997 17.6569 17.6569C18.3997 16.914 18.989 16.0321 19.391 15.0615C19.7931 14.0909 20 13.0506 20 12C20 10.9494 19.7931 9.90914 19.391 8.93853C18.989 7.96793 18.3997 7.08601 17.6569 6.34315C16.914 5.60028 16.0321 5.011 15.0615 4.60896C14.0909 4.20693 13.0506 4 12 4ZM12 5.14286C13.8186 5.14286 15.5628 5.8653 16.8487 7.15127C18.1347 8.43723 18.8571 10.1814 18.8571 12C18.8571 13.8186 18.1347 15.5628 16.8487 16.8487C15.5628 18.1347 13.8186 18.8571 12 18.8571C10.1814 18.8571 8.43723 18.1347 7.15127 16.8487C5.8653 15.5628 5.14286 13.8186 5.14286 12C5.14286 10.1814 5.8653 8.43723 7.15127 7.15127C8.43723 5.8653 10.1814 5.14286 12 5.14286ZM12 5.24316C10.2079 5.24316 8.48889 5.95447 7.22168 7.22168C5.95447 8.48889 5.24316 10.2079 5.24316 12C5.24316 13.7921 5.95447 15.5111 7.22168 16.7783C8.48889 18.0455 10.2079 18.7568 12 18.7568C13.7921 18.7568 15.5111 18.0455 16.7783 16.7783C18.0455 15.5111 18.7568 13.7921 18.7568 12C18.7568 10.2079 18.0455 8.48889 16.7783 7.22168C15.5111 5.95447 13.7921 5.24316 12 5.24316ZM12 7.32812C13.2389 7.32813 14.4267 7.8212 15.3027 8.69727C16.1788 9.57333 16.6719 10.7611 16.6719 12C16.6719 13.2389 16.1788 14.4267 15.3027 15.3027C14.4267 16.1788 13.2389 16.6719 12 16.6719C10.7611 16.6719 9.57333 16.1788 8.69727 15.3027C7.8212 14.4267 7.32813 13.2389 7.32812 12C7.32813 10.7611 7.8212 9.57333 8.69727 8.69727C9.57333 7.8212 10.7611 7.32813 12 7.32812ZM12 7.42857C10.7876 7.42857 9.62482 7.9102 8.76751 8.76751C7.9102 9.62482 7.42857 10.7876 7.42857 12C7.42857 13.2124 7.9102 14.3752 8.76751 15.2325C9.62482 16.0898 10.7876 16.5714 12 16.5714C13.2124 16.5714 14.3752 16.0898 15.2325 15.2325C16.0898 14.3752 16.5714 13.2124 16.5714 12C16.5714 10.7876 16.0898 9.62482 15.2325 8.76751C14.3752 7.9102 13.2124 7.42857 12 7.42857ZM12 8.57143C12.9093 8.57143 13.7814 8.93265 14.4244 9.57563C15.0673 10.2186 15.4286 11.0907 15.4286 12C15.4286 12.9093 15.0673 13.7814 14.4244 14.4244C13.7814 15.0673 12.9093 15.4286 12 15.4286C11.0907 15.4286 10.2186 15.0673 9.57563 14.4244C8.93265 13.7814 8.57143 12.9093 8.57143 12C8.57143 11.0907 8.93265 10.2186 9.57563 9.57563C10.2186 8.93265 11.0907 8.57143 12 8.57143ZM12 8.67188C11.1172 8.67188 10.2707 9.02226 9.64648 9.64648C9.02226 10.2707 8.67188 11.1172 8.67188 12C8.67188 12.8828 9.02226 13.7293 9.64648 14.3535C10.2707 14.9777 11.1172 15.3281 12 15.3281C12.8828 15.3281 13.7293 14.9777 14.3535 14.3535C14.9777 13.7293 15.3281 12.8828 15.3281 12C15.3281 11.1172 14.9777 10.2707 14.3535 9.64648C13.7293 9.02226 12.8828 8.67188 12 8.67188ZM12 10.7568C12.3296 10.7568 12.6458 10.888 12.8789 11.1211C13.112 11.3542 13.2432 11.6704 13.2432 12C13.2432 12.3296 13.112 12.6458 12.8789 12.8789C12.6458 13.112 12.3296 13.2432 12 13.2432C11.6704 13.2432 11.3542 13.112 11.1211 12.8789C10.888 12.6458 10.7568 12.3296 10.7568 12C10.7568 11.6704 10.888 11.3542 11.1211 11.1211C11.3542 10.888 11.6704 10.7568 12 10.7568ZM12 10.8571C11.6969 10.8571 11.4062 10.9776 11.1919 11.1919C10.9776 11.4062 10.8571 11.6969 10.8571 12C10.8571 12.3031 10.9776 12.5938 11.1919 12.8081C11.4062 13.0224 11.6969 13.1429 12 13.1429C12.3031 13.1429 12.5938 13.0224 12.8081 12.8081C13.0224 12.5938 13.1429 12.3031 13.1429 12C13.1429 11.6969 13.0224 11.4062 12.8081 11.1919C12.5938 10.9776 12.3031 10.8571 12 10.8571Z" fill="currentColor"/>
             </svg>
           \`;
           selectIcon.title = "Sélectionner ce calque";
@@ -729,21 +1210,12 @@ const q=`<!DOCTYPE html>
           const normalUnboundItems = unboundSplit.normal;
           const effectGroupsBlock = renderEffectGroupsSection(boundSplit.effectItems, unboundSplit.effectItems);
 
-          // Ajouter les propriétés non variabilisées s'il y en a (hors effets)
+          // Propriétés non variabilisées (hors effets) : rendues inline dans
+          // la layer-section comme les bound rows. Plus de wrapper .danger —
+          // la pill .unbound-variable porte déjà l'identité rouge.
           if (normalUnboundItems && normalUnboundItems.length > 0) {
-            // Grouper aussi les propriétés non liées
             const groupedUnboundItems = groupSimilarUnboundProperties(normalUnboundItems);
-
-            const warn = document.createElement("div");
-            warn.className = "danger";
-            const wt = document.createElement("h3");
-            wt.appendChild(document.createTextNode("🚨 Non‑variabilisé"));
-            warn.appendChild(wt);
-
-            // Utiliser la fonction renderItemsList pour les éléments non liés
-            const ulWarn = renderItemsList(groupedUnboundItems, true);
-            warn.appendChild(ulWarn);
-            section.appendChild(warn);
+            section.appendChild(renderItemsList(groupedUnboundItems, true));
           }
 
           // Ajouter les variables liées s'il y en a (hors effets)
@@ -768,11 +1240,90 @@ const q=`<!DOCTYPE html>
           container.appendChild(section);
         }
       }
-    };
+    }
+
+    window.onmessage = (event) => handlePluginMessage(event.data.pluginMessage);
   <\/script>
 </body>
 
-</html>`,Y=`body {
+</html>`,J=`:root {
+  --fg-accent: #0d99ff;
+  --fg-text: #1e1e1e;
+  --fg-text-secondary: #555555;
+  --fg-text-muted: #b3b3b3;
+  --fg-text-tertiary: #999999;
+  --fg-border: #e6e6e6;
+  --fg-divider: #eeeeee;
+  --fg-bg: #ffffff;
+  --fg-bg-soft: #f5f5f5;
+  --fg-bg-hover: #ebebeb;
+  --fg-radius: 6px;
+  --fg-radius-pill: 999px;
+
+  /* Semantic — variable origin */
+  --fg-local-bg: #e3f1ff;
+  --fg-local-fg: #1969d2;
+  --fg-external-bg: #eee8ff;
+  --fg-external-fg: #6451cf;
+
+  /* Semantic — danger / hardcoded properties */
+  --fg-danger-bg: #ffdcdc;
+  --fg-danger-fg: #8f0000;
+  --fg-danger-text: #b12020;
+  --fg-danger-border: #fdafaf;
+  --fg-danger-pill-bg: #fdb8b8;
+
+  /* Stats dashboard */
+  --fg-stats-bg: #f7fafd;
+  --fg-stats-border: #e0e8f0;
+  --fg-stats-bar: #e0e0e0;
+
+  /* Variable-path breadcrumb */
+  --fg-path-bg: #f7fafd;
+  --fg-path-border: #1969d2;
+  --fg-alias: #b06000;
+
+  /* Layer header tint */
+  --fg-header-bg: #e5f4ff;
+  --fg-ul-border: #e5f4ff;
+}
+
+html.figma-dark {
+  --fg-accent: #0d99ff;
+  --fg-text: #ffffff;
+  --fg-text-secondary: #cccccc;
+  --fg-text-muted: #999999;
+  --fg-text-tertiary: #777777;
+  --fg-border: #444444;
+  --fg-divider: #383838;
+  --fg-bg: #2c2c2c;
+  --fg-bg-soft: #383838;
+  --fg-bg-hover: #444444;
+
+  --fg-local-bg: #1c3a52;
+  --fg-local-fg: #64b6ff;
+  --fg-external-bg: #2d2440;
+  --fg-external-fg: #a99cf5;
+
+  --fg-danger-bg: #4a1f1f;
+  --fg-danger-fg: #ff8c8c;
+  --fg-danger-text: #ffaaaa;
+  --fg-danger-border: #6b2a2a;
+  --fg-danger-pill-bg: #5a2424;
+
+  --fg-stats-bg: #1f2a35;
+  --fg-stats-border: #2d3845;
+  --fg-stats-bar: #444444;
+
+  --fg-path-bg: #1f2a35;
+  --fg-path-border: #64b6ff;
+  --fg-alias: #ffb060;
+
+  --fg-header-bg: #1c3a52;
+  --fg-ul-border: #2d3845;
+}
+
+body {
   font-family: Inter, sans-serif;
   margin: 0;
   padding: 1rem;
@@ -781,6 +1332,34 @@ const q=`<!DOCTYPE html>
   box-sizing: border-box;
   overflow: auto;
   min-height: 200px;
+  background: var(--fg-bg);
+  color: var(--fg-text);
+  scrollbar-color: var(--fg-border) transparent;
+  scrollbar-width: thin;
+}
+
+/* Custom scrollbar — Figma-native thin, hover-revealed, themed via tokens. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fg-border);
+  border-radius: 5px;
+  border: 2px solid var(--fg-bg);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-text-muted);
+  background-clip: padding-box;
+  border: 2px solid var(--fg-bg);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 h2 {
@@ -791,7 +1370,7 @@ h2 {
 
 ul {
   padding-left: 8px;
-  border-left: 1px solid #E5F4FF;
+  border-left: 1px solid var(--fg-ul-border);
 }
 
 li {
@@ -814,13 +1393,13 @@ li {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
+  color: var(--fg-text-tertiary);
   transition: color 0.15s ease;
   z-index: 1000;
 }
 
 .resize-handle:hover {
-  color: #666;
+  color: var(--fg-text-secondary);
 }
 
 .resize-handle svg {
@@ -830,7 +1409,7 @@ li {
 
 .layer-section {
   margin-bottom: 16px;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid var(--fg-border);
   padding-bottom: 16px;
   width: 100%;
 }
@@ -854,13 +1433,13 @@ li {
 }
 
 .local-variable {
-  background-color: #e3f1ff;
-  color: #1969d2;
+  background-color: var(--fg-local-bg);
+  color: var(--fg-local-fg);
 }
 
 .external-variable {
-  background-color: #eee8ff;
-  color: #6451cf;
+  background-color: var(--fg-external-bg);
+  color: var(--fg-external-fg);
 }
 
 /* Styles pour les groupes de propriétés */
@@ -886,7 +1465,7 @@ li {
 .property-sub-list .property-name {
   width: 100px;
   font-size: 0.75em;
-  color: #555;
+  color: var(--fg-text-secondary);
 }
 
 /* Styles pour les propriétés principales */
@@ -949,11 +1528,11 @@ li {
 
 .property-name {
   font-weight: 600;
-  color: #333;
+  color: var(--fg-text);
 }
 
 .danger .property-name {
-  color: #8F0000;
+  color: var(--fg-danger-fg);
 }
 
 .danger .title-property-container {
@@ -969,7 +1548,7 @@ li {
   justify-content: space-between;
   padding: 0.5em 0.75em;
   border-radius: 6px;
-  background: #E5F4FF;
+  background: var(--fg-header-bg);
   margin-bottom: 0.5em;
 }
 
@@ -986,14 +1565,14 @@ li {
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: #666;
+  color: var(--fg-text-secondary);
   /* Couleur par défaut */
   transition: color 0.15s ease;
 }
 
 /* Couleur au survol pour donner un feedback visuel */
 .select-icon:hover {
-  color: #000;
+  color: var(--fg-text);
 }
 
 /* Icônes de type de calque */
@@ -1003,7 +1582,7 @@ li {
   height: 24px;
   margin-right: 4px;
   /* espace entre icône et titre */
-  color: #000;
+  color: var(--fg-text);
   /* couleur par défaut, remplaçable */
 }
 
@@ -1014,26 +1593,26 @@ li {
 }
 
 .danger {
-  background: #ffdcdc;
+  background: var(--fg-danger-bg);
   padding: 12px;
   margin-bottom: 1em;
   border-radius: 6px;
-  color: #B12020;
+  color: var(--fg-danger-text);
 }
 
 .danger h3 {
   margin-top: 0;
   font-size: 1rem;
   line-height: 1rem;
-  color: #8F0000;
+  color: var(--fg-danger-fg);
 }
 
 .danger ul {
-  border-left: 1px solid #fdafaf;
+  border-left: 1px solid var(--fg-danger-border);
 }
 .unbound-variable {
-  color: #8F0000;
-  background: #fdb8b8;
+  color: var(--fg-danger-fg);
+  background: var(--fg-danger-pill-bg);
   position: relative;
   padding-left: 32px;
 }
@@ -1046,11 +1625,17 @@ li {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: #8F0000;
+  color: var(--fg-danger-fg);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238F0000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+/* Dark-mode: re-embed the same warning SVG with a brighter stroke so it
+   stays legible on the deep-red --fg-danger-pill-bg (#5a2424). */
+html.figma-dark .unbound-variable::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ff8c8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
 }
 
 /* Effect-group sub-prop rows reuse property-container; the .danger modifier
@@ -1076,17 +1661,17 @@ li {
   margin-left: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #1969d2;
+  background: var(--fg-accent);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s ease;
+  transition: filter 0.15s ease;
 }
 
 .merge-badge:hover {
-  background: #1454ab;
+  filter: brightness(0.9);
 }
 
 .pill-wrapper {
@@ -1097,10 +1682,10 @@ li {
 .variable-path {
   margin-top: 4px;
   padding: 6px 10px;
-  background: #f7fafd;
-  border-left: 2px solid #1969d2;
+  background: var(--fg-path-bg);
+  border-left: 2px solid var(--fg-path-border);
   font-size: 11px;
-  color: #444;
+  color: var(--fg-text-secondary);
   border-radius: 0 4px 4px 0;
   animation: slide-down 150ms ease-out;
 }
@@ -1111,7 +1696,7 @@ li {
 }
 
 .alias-tag {
-  color: #b06000;
+  color: var(--fg-alias);
   font-style: italic;
   font-size: 10px;
   margin-left: 4px;
@@ -1131,9 +1716,9 @@ li {
 .toolbar {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--fg-bg);
   padding: 8px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--fg-divider);
   margin: -1rem -1rem 1rem -1rem;
   padding-left: 1rem;
   padding-right: 1rem;
@@ -1146,28 +1731,9 @@ li {
   justify-content: space-between;
 }
 
-.sort-toggle {
-  display: inline-flex;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.sort-toggle button {
-  background: #fff;
-  border: none;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  border-right: 1px solid #ccc;
-}
-
-.sort-toggle button:last-child { border-right: none; }
-.sort-toggle button.active { background: #1969d2; color: #fff; }
-
 .property-section {
   margin-bottom: 16px;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid var(--fg-border);
   padding-bottom: 12px;
 }
 
@@ -1180,7 +1746,7 @@ li {
 }
 
 .property-row-layer {
-  color: #1969d2;
+  color: var(--fg-accent);
 }
 
 .property-row-layer:hover { text-decoration: underline; }
@@ -1188,21 +1754,21 @@ li {
 .stats-dashboard {
   margin-bottom: 12px;
   padding: 8px 10px;
-  background: #f7fafd;
+  background: var(--fg-stats-bg);
   border-radius: 6px;
-  border: 1px solid #e0e8f0;
+  border: 1px solid var(--fg-stats-border);
 }
 
 .stats-line {
   font-size: 12px;
-  color: #444;
+  color: var(--fg-text-secondary);
   margin-bottom: 4px;
 }
 
 .stats-bar {
   position: relative;
   height: 8px;
-  background: #e0e0e0;
+  background: var(--fg-stats-bar);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 6px;
@@ -1210,7 +1776,7 @@ li {
 
 .stats-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #1969d2, #19a3d2);
+  background: linear-gradient(90deg, var(--fg-accent), #19a3d2);
   transition: width 0.3s ease;
 }
 
@@ -1219,7 +1785,7 @@ li {
   top: -16px;
   right: 0;
   font-size: 10px;
-  color: #666;
+  color: var(--fg-text-secondary);
 }
 
 .color-swatch {
@@ -1238,83 +1804,165 @@ li {
   background-position: 0 0, 0 3px, 3px -3px, -3px 0;
 }
 
-.rescan-btn {
-  background: transparent;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 16px;
-  color: #555;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.rescan-btn:hover {
-  color: #1969d2;
-  border-color: #1969d2;
-}
-
-.rescan-btn.scanning {
-  animation: spin 1s linear infinite;
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.search-input {
+.empty-state {
+  text-align: center;
+  color: var(--fg-text-tertiary);
+  padding: 2rem 1rem;
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   Figma UI3 toolbar — replaces the legacy .search-input / .rescan-btn /
+   .sort-toggle / .filter-row / .chip rules. The legacy rules are removed
+   in a follow-up commit once renderToolbar() emits the new markup.
+   ========================================================================== */
+
+.fg-search {
   flex: 1;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-right: 8px;
+  height: 28px;
+  padding: 0 8px 0 26px;
+  border: 1px solid transparent;
+  border-radius: var(--fg-radius);
+  background: var(--fg-bg-soft) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 8px center;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background-color 0.1s, border-color 0.1s;
 }
-
-.search-input:focus {
+.fg-search::placeholder { color: var(--fg-text-muted); }
+.fg-search:focus {
   outline: none;
-  border-color: #1969d2;
+  background-color: var(--fg-bg);
+  border-color: var(--fg-accent);
 }
 
-.filter-row {
+.fg-ghost {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-text);
+  transition: background 0.1s;
+}
+.fg-ghost:hover { background: var(--fg-bg-soft); }
+.fg-ghost svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.fg-rescan.scanning svg { animation: spin 1s linear infinite; }
+
+.fg-seg {
+  display: inline-flex;
+  background: var(--fg-bg-soft);
+  border-radius: var(--fg-radius);
+  padding: 2px;
+}
+.fg-seg button {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--fg-text);
+  font-family: inherit;
+  font-weight: 400;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.fg-seg button.active {
+  background: var(--fg-bg);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.fg-filter-btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--fg-radius);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--fg-text);
+  font-family: inherit;
+  transition: background 0.1s;
+}
+.fg-filter-btn:hover { background: var(--fg-bg-soft); }
+.fg-filter-btn .fg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--fg-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+.fg-filter-btn .fg-caret {
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.fg-filter-btn[data-expanded="true"] .fg-caret { transform: rotate(180deg); }
+
+.fg-filters {
+  margin-top: 6px;
+  padding: 6px 0 2px 0;
+}
+.fg-frow {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
   flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.fg-frow:last-child { margin-bottom: 0; }
+.fg-flabel {
+  font-size: 10px;
+  color: var(--fg-text-muted);
+  min-width: 44px;
+  font-weight: 500;
 }
 
-.filter-label {
-  color: #666;
-  margin-right: 4px;
-}
-
-.chip {
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+.fg-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: none;
+  border-radius: var(--fg-radius-pill);
+  background: var(--fg-bg-soft);
+  font-size: 10px;
+  color: var(--fg-text);
   cursor: pointer;
-  color: #555;
-  transition: all 0.15s;
+  font-family: inherit;
+  font-weight: 400;
+  transition: background 0.1s, color 0.1s;
 }
-
-.chip:hover {
-  border-color: #1969d2;
-  color: #1969d2;
-}
-
-.chip.active {
-  background: #1969d2;
+.fg-chip:hover { background: var(--fg-bg-hover); }
+.fg-chip.active {
+  background: var(--fg-accent);
   color: #fff;
-  border-color: #1969d2;
-}
-
-.empty-state {
-  text-align: center;
-  color: #999;
-  padding: 2rem 1rem;
-  font-size: 14px;
-}`,c={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},Z={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},W=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"];function X(){try{return!0}catch(e){return!1}}const E=X(),y={log:(...e)=>{E||console.log(...e)},warn:(...e)=>{E||console.warn(...e)},error:(...e)=>{E||console.error(...e)}},S=new Set,V=new Set;function K(e,n,t){return`${e}|${n}`}function J(){S.clear(),V.clear()}function v(e,n,t){const r=K(e,n);return y.log(`Checking property: ${r}, propertyName: ${n}, exists: ${V.has(r)}`),W.some(o=>n.includes(o))?(y.log(`Skipping deduplication for spacing property: ${n}`),V.add(r),!1):V.has(r)?!0:(V.add(r),!1)}const I=/^I?\d+:\d+(;\d+:\d+)*$/,Q=/^I(\d+:\d+)/;function F(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!I.test(n.parent.name)?n.parent.name:I.test(n.name)?null:n.name:null}function D(e,n){var i;let t=e,r=0;for(;t&&r<n;){const o=t.name;if(typeof o=="string"&&!I.test(o)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return o;t=(i=t.parent)!=null?i:null,r++}return null}function e1(e){const n=Q.exec(e);if(!n)return null;const t=figma.getNodeById(n[1]);if(!t)return null;if(!I.test(t.name))return t.name;if(t.type==="INSTANCE"){const r=F(t);if(r)return r}return D(t.parent,5)}function u(e){if(!I.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=F(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!I.test(r.name))return r.name}const n=D(e.parent,10);if(n)return n;const t=e1(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const n1=[{key:"minWidth",name:c.MIN_WIDTH},{key:"maxWidth",name:c.MAX_WIDTH},{key:"minHeight",name:c.MIN_HEIGHT},{key:"maxHeight",name:c.MAX_HEIGHT}];function t1(e,n){var r;const t=e.boundVariables;if(t)for(const{key:i,name:o}of n1){const C=(r=t[i])==null?void 0:r.id;C&&n.push({layer:u(e),property:o,id:C})}}function r1(e,n){var r,i;const t=e.layoutGrids;if(Array.isArray(t))for(const o of t){const C=(i=(r=o.boundVariables)==null?void 0:r.color)==null?void 0:i.id;C&&n.push({layer:u(e),property:c.GRID_COLOR,id:C})}}function o1(e,n){var r,i;const t=(i=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:i.id;t&&n.push({layer:u(e),property:c.VISIBLE,id:t})}function i1(e,n){var o,C;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(o=t.textDecoration)==null?void 0:o.id,i=(C=t.textCase)==null?void 0:C.id;r&&n.push({layer:u(e),property:c.TEXT_DECORATION,id:r}),i&&n.push({layer:u(e),property:c.TEXT_CASE,id:i})}function C1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[i,o]of Object.entries(t))o!=null&&o.id&&n.push({layer:u(e),property:`Component / ${i}`,id:o.id})}function s1(e,n){var C;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const i=new Set,o=new Set;for(const s of t){const l=(C=s.boundVariables)==null?void 0:C.color;l!=null&&l.id&&!i.has(l.id)&&(o.add(l.id),i.add(l.id))}if(o.size>0){const s=Array.from(o)[0];n.push({layer:u(e),property:c.FILL,id:s}),o.size>1&&y.log(`${e.name} has ${o.size} fill variables, only the first is shown`)}}function a1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const o=(t=r.boundVariables)==null?void 0:t.color;o!=null&&o.id&&n.push({layer:u(e),property:c.STROKE_COLOR,id:o.id})}}function $(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function l1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function p1(e,n){var o,C;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const s of t)r[s.type]=((o=r[s.type])!=null?o:0)+1;const i={};for(const s of t){if(!s.boundVariables)continue;const a=r[s.type];i[s.type]=((C=i[s.type])!=null?C:0)+1;const l=i[s.type],d=$(s.type),p=a>1?`${d} ${l}`:d;for(const[b,f]of Object.entries(s.boundVariables))if(f.id){const g=l1(b,s.type);n.push({layer:u(e),property:`${p} ${b}`,id:f.id,effectGroup:p,subProp:g})}}}function c1(e,n){var C,s;const r=e.boundVariables;if(!r)return;const i=new Set(["color","fills","fills.0"]);for(const[a,l]of Object.entries(r)){if(i.has(a)||a.startsWith("fills."))continue;const d=l;if(d.id){const p=(C=Z[a])!=null?C:a;n.push({layer:u(e),property:p,id:d.id})}}const o=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const a of o){const l=e,d=r[a];if(l[a]!==void 0&&(d!=null&&d.id)){const p=(s=Z[a])!=null?s:a;n.push({layer:u(e),property:p,id:d.id})}}}function d1(e,n){var o;const t=e.boundVariables;if(!t)return;const r={fontSize:c.FONT_SIZE,fontWeight:c.FONT_WEIGHT,fontFamily:c.FONT_FAMILY,letterSpacing:c.LETTER_SPACING,lineHeight:c.LINE_HEIGHT,paragraphSpacing:c.PARAGRAPH_SPACING};for(const[C,s]of Object.entries(r)){const a=t[C];a!=null&&a.id&&(n.push({layer:u(e),property:s,id:a.id}),C==="fontSize"&&S.add(e.id))}const i={};z(t,i);for(const[C,s]of Object.entries(i)){let a=C;for(const[l,d]of Object.entries(r))if(C.includes(l)){a=d,l==="fontSize"&&S.add(e.id);break}a===C&&(a=(o=Z[C])!=null?o:C);for(const l of s)n.push({layer:u(e),property:a,id:l})}}function z(e,n,t=[]){if(!(!e||typeof e!="object")){if(typeof e.id=="string"){const r=t.join(".");!r.startsWith("fills.")&&r!=="fills"&&(n[r]||(n[r]=[]),n[r].push(e.id));return}for(const r of Object.keys(e))r==="fills"||t.length>0&&t[0]==="fills"||z(e[r],n,[...t,r])}}function U(e){const n=[];return s1(e,n),a1(e,n),p1(e,n),t1(e,n),r1(e,n),o1(e,n),e.type==="TEXT"&&(d1(e,n),i1(e,n)),e.type==="INSTANCE"&&C1(e,n),c1(e,n),n}function j(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children)}return n}const P=new Map,u1=10;async function R(e,n){var l,d;const t=[];let r=e;for(let p=0;p<u1;p++){t.push(r.name);const b=Object.keys((l=r.valuesByMode)!=null?l:{});if(b.length===0)break;const f=r.valuesByMode[b[0]];if(typeof f=="object"&&f!==null&&f.type==="VARIABLE_ALIAS"){const g=f.id,m=await figma.variables.getVariableByIdAsync(g);if(!m||m.id===r.id)break;r=m;continue}break}const i=t.length>1,o=await f1(r.variableCollectionId),C=r.name.split("/").filter(p=>p.length>0),s=(d=C.pop())!=null?d:r.name,a={collection:o,groups:C,name:s,isAlias:i};return n&&(a.library=g1(r)),i&&(a.aliasChain=t),a}async function f1(e){if(P.has(e))return P.get(e);const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)if(P.set(t.id,t.name),t.id===e)return t.name;return"Unknown collection"}function g1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function A(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=e.valuesByMode[n[0]];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function m1(){const e=new Map;return await h1(e),await y1(e),y.log("loadVariables: found",e.size,"variables"),e}async function h1(e){const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)for(const r of t.variableIds){const i=await figma.variables.getVariableByIdAsync(r);if(!i)continue;const o=await R(i,!1);e.set(r,{name:i.name,type:i.resolvedType,origin:"local",colorValue:A(i),path:o})}}async function y1(e){const n=figma.currentPage.selection,t=j(n),r=new Set;for(const i of t){const o=U(i);for(const{id:C}of o)e.has(C)||r.add(C)}for(const i of r)try{const o=await figma.variables.getVariableByIdAsync(i);if(!o)continue;const C=await R(o,!0);if(e.set(i,{name:o.name,type:o.resolvedType,origin:"external",colorValue:A(o),path:C}),typeof figma.variables.importVariableByKeyAsync=="function"){const s=await figma.variables.importVariableByKeyAsync(o.key);if(s){const a=await R(s,!0);e.set(i,{name:s.name,type:s.resolvedType,origin:"external",colorValue:A(s),path:a})}}}catch(o){y.warn(`Failed to resolve variable ${i}:`,o)}}function N(e){return Number(e.toFixed(2)).toString()}function b1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function v1(e,n){var o,C,s,a,l,d;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const p of t)r[p.type]=((o=r[p.type])!=null?o:0)+1;const i={};for(const p of t){const b=r[p.type];i[p.type]=((C=i[p.type])!=null?C:0)+1;const f=i[p.type],g=$(p.type),m=b>1?`${g} ${f}`:g,T=p.type.includes("BLUR")||p.type.includes("SHADOW"),L=(s=p.boundVariables)!=null?s:{},M=u(e);if(typeof p.radius=="number"){const h=L.radius;if(!(h!=null&&h.id)){const H=T?"Blur":"Radius";n.push({layer:M,layerId:e.id,property:`${m} ${H}`,value:N(p.radius),effectGroup:m,subProp:H})}}if(p.type.includes("SHADOW")&&p.offset){const h=(a=L.offset)!=null?a:{};typeof p.offset.x=="number"&&!((l=h.x)!=null&&l.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset X`,value:N(p.offset.x),effectGroup:m,subProp:"Offset X"}),typeof p.offset.y=="number"&&!((d=h.y)!=null&&d.id)&&n.push({layer:M,layerId:e.id,property:`${m} Offset Y`,value:N(p.offset.y),effectGroup:m,subProp:"Offset Y"})}if(typeof p.spread=="number"){const h=L.spread;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Spread`,value:N(p.spread),effectGroup:m,subProp:"Spread"})}if(p.color){const h=L.color;h!=null&&h.id||n.push({layer:M,layerId:e.id,property:`${m} Color`,value:b1(p.color),effectGroup:m,subProp:"Color"})}}}function w(e){return Number(e.toFixed(2)).toString()}function G(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function L1(e,n){var t,r,i,o;if("fills"in e&&Array.isArray(e.fills))for(const C of e.fills){const s=C;!((r=(t=s.boundVariables)==null?void 0:t.color)!=null&&r.id)&&s.color&&n.push({layer:u(e),layerId:e.id,property:c.FILL,value:G(s.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let C;for(const s of e.strokes){const a=s;if(!((o=(i=a.boundVariables)==null?void 0:i.color)!=null&&o.id)&&a.color){C=a.color;break}}C&&!v(e.id,c.STROKE)&&(n.push({layer:u(e),layerId:e.id,property:c.STROKE,value:G(C)}),e.strokes.length>1&&y.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function M1(e,n){var r,i;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(i=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&i.id||v(e.id,c.OPACITY)||n.push({layer:u(e),layerId:e.id,property:c.OPACITY,value:w(t)})}function w1(e,n){var C,s,a,l,d,p,b;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((s=(C=t.strokes)==null?void 0:C.length)!=null?s:0)>0))return;const i=e.strokeWeight,o="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof i=="number"&&i!==0&&!((l=(a=e.boundVariables)==null?void 0:a.strokeWeight)!=null&&l.id)&&!o&&(v(e.id,c.STROKE_WEIGHT)||n.push({layer:u(e),layerId:e.id,property:c.STROKE_WEIGHT,value:w(i)}));for(const f of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(f in e))continue;const g=e[f];if(typeof g!="number"||g===0||(p=(d=e.boundVariables)==null?void 0:d[f])!=null&&p.id)continue;const m=(b=Z[f])!=null?b:f;v(e.id,m)||n.push({layer:u(e),layerId:e.id,property:m,value:w(g)})}}function H1(e,n){var t,r,i,o,C;if("cornerRadius"in e){const s=e.cornerRadius,a="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof s=="number"&&s!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!a&&(v(e.id,c.CORNER_RADIUS)||n.push({layer:u(e),layerId:e.id,property:c.CORNER_RADIUS,value:w(s)}))}for(const s of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(s in e))continue;const a=e[s];if(typeof a!="number"||a===0||(o=(i=e.boundVariables)==null?void 0:i[s])!=null&&o.id)continue;const l=(C=Z[s])!=null?C:s;v(e.id,l)||n.push({layer:u(e),layerId:e.id,property:l,value:w(a)})}}function x1(e,n){var i,o;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:c.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:c.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:c.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:c.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:C,displayName:s,skipIfProcessed:a}of r){if(a&&C==="fontSize"&&S.has(t.id))continue;const l=t[C];typeof l!="number"||l===0||(o=(i=e.boundVariables)==null?void 0:i[C])!=null&&o.id||v(e.id,s)||n.push({layer:u(e),layerId:e.id,property:s,value:w(l)})}}function I1(e,n){var r,i;const t=[{key:"paddingLeft",displayName:c.PADDING_LEFT},{key:"paddingRight",displayName:c.PADDING_RIGHT},{key:"paddingTop",displayName:c.PADDING_TOP},{key:"paddingBottom",displayName:c.PADDING_BOTTOM},{key:"itemSpacing",displayName:c.ITEM_SPACING}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||(y.log(`Found spacing property ${o} = ${s} on node ${e.name}`),v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)}))}}function V1(e,n){var r,i;const t=[{key:"minWidth",displayName:c.MIN_WIDTH},{key:"maxWidth",displayName:c.MAX_WIDTH},{key:"minHeight",displayName:c.MIN_HEIGHT},{key:"maxHeight",displayName:c.MAX_HEIGHT}];for(const{key:o,displayName:C}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||v(e.id,C)||n.push({layer:u(e),layerId:e.id,property:C,value:w(s)})}}function Z1(e,n){const t=e;M1(t,n),w1(t,n),H1(t,n),x1(t,n),I1(t,n),V1(t,n)}function N1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const i=e;if(!i.mainComponent)return null;const o=i.mainComponent.id,C=((n=i.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?i.mainComponent.parent.id:"",s=JSON.stringify(_((t=i.componentProperties)!=null?t:{})),a=JSON.stringify(_((r=i.boundVariables)!=null?r:{}));return[o,C,s,a].join("|")}catch(i){return null}}function S1(e){var t,r;const n=new Map;for(const i of e){const o=(t=N1(i))!=null?t:`__node__${i.id}`,C=(r=n.get(o))!=null?r:[];C.push(i),n.set(o,C)}return n}function _(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function T1(e,n,t){const r=Object.values(e).flat(),i=r.length,o=n.length,C=i+o,s=C===0?0:i/C,a={local:0,external:0},l={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)a[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(l[d.type]+=1);return{totalVariables:i,totalHardcoded:o,variableCoverage:s,byOrigin:a,byType:l,layerCount:Object.keys(e).length,scanDurationMs:t}}function E1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function P1(e,n,t){const r=new Map,i=async(o,C,s)=>{if(r.has(o))return;const a=await figma.getNodeByIdAsync(o);if(a){const l=t.get(o),d={id:o,name:C,order:s,type:E1(a)};l&&(d.count=l.count,d.mergedNodeIds=l.nodeIds),r.set(o,d)}};for(let o=0;o<e.length;o++){const C=e[o];await i(C.layerId,C.layer,o)}for(let o=0;o<n.length;o++){const C=n[o];await i(C.layerId,C.layer,e.length+o)}return r}function k1(e){var i;const n={};y.log(`Grouping ${e.length} usages by layer`);const t=new Map,r=[...e].sort((o,C)=>{const s=o.layer.localeCompare(C.layer);return s!==0?s:o.property.localeCompare(C.property)});for(const o of r){n[o.layerId]||(n[o.layerId]=[],t.set(o.layerId,new Set));const C=t.get(o.layerId),s=`${o.property}_${(i=o.id)!=null?i:""}`,a=W.some(l=>o.property.includes(l));y.log(`Layer: ${o.layer}, Property: ${o.property}, isSpacing: ${a}, isDuplicate: ${C.has(s)}`),(!C.has(s)||a)&&(n[o.layerId].push(o),C.add(s))}for(const[o,C]of Object.entries(n))y.log(`Layer ${o}: ${C.length} usages after grouping`);return n}async function k(){try{await R1()}catch(e){y.error("updateInspector error",e);const n={type:"error",message:String(e)};figma.ui.postMessage(n)}}async function R1(){J();const e=Date.now();figma.ui.postMessage({type:"scan-start"});const n=await m1(),t=figma.currentPage.selection,r=j(t),i=S1(r),o=[],C=[],s=new Map;for(const[,f]of i){const g=f[0];f.length>1&&g.type==="INSTANCE"&&s.set(g.id,{count:f.length,nodeIds:f.map(L=>L.id)});const T=U(g);for(const L of T){const{layer:M,property:h,id:H,effectGroup:O,subProp:B}=L,x=n.get(H);o.push(x?{layer:M,layerId:g.id,property:h,name:x.name,type:x.type,origin:x.origin,colorValue:x.colorValue,id:H,path:x.path,effectGroup:O,subProp:B}:{layer:M,layerId:g.id,property:h,name:H,type:"STRING",origin:"external",id:H,effectGroup:O,subProp:B})}L1(g,C),Z1(g,C),v1(g,C)}const a=await P1(o,C,s),l=k1(o);y.log("Final usages count:",o.length),y.log("Layers with variables:",Object.keys(l).length),y.log("Unbound usages count:",C.length),y.log("Total nodes in layerInfoMap:",a.size);const d=Date.now()-e,p=T1(l,C,d),b={type:"render",byLayer:l,unbound:C,layerInfoMap:Object.fromEntries(a),noVariablesFound:o.length===0&&C.length===0,stats:p,scanDurationMs:d};figma.ui.postMessage(b)}function A1(){figma.showUI(q.replace("</head>",`<style>${Y}</style></head>`),{width:300,height:400,title:"Variable Inspector"}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"&&k()};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{k()},300)}),k()}A1();
+}`,c={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},V={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},D=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"];function Q(){try{return!0}catch(e){return!1}}const Z=Q(),m={log:(...e)=>{Z||console.log(...e)},warn:(...e)=>{Z||console.warn(...e)},error:(...e)=>{Z||console.error(...e)}},T=new Set,E=new Set;function e1(e,n,t){return`${e}|${n}`}function n1(){T.clear(),E.clear()}function M(e,n,t){const r=e1(e,n);return m.log(`Checking property: ${r}, propertyName: ${n}, exists: ${E.has(r)}`),D.some(o=>n.includes(o))?(m.log(`Skipping deduplication for spacing property: ${n}`),E.add(r),!1):E.has(r)?!0:(E.add(r),!1)}const S=/^I?\d+:\d+(;\d+:\d+)*$/,t1=/^I(\d+:\d+)/;function q(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!S.test(n.parent.name)?n.parent.name:S.test(n.name)?null:n.name:null}function U(e,n){var i;let t=e,r=0;for(;t&&r<n;){const o=t.name;if(typeof o=="string"&&!S.test(o)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return o;t=(i=t.parent)!=null?i:null,r++}return null}function r1(e){const n=t1.exec(e);if(!n)return null;const t=figma.getNodeById(n[1]);if(!t)return null;if(!S.test(t.name))return t.name;if(t.type==="INSTANCE"){const r=q(t);if(r)return r}return U(t.parent,5)}function u(e){if(!S.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=q(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!S.test(r.name))return r.name}const n=U(e.parent,10);if(n)return n;const t=r1(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const o1=[{key:"minWidth",name:c.MIN_WIDTH},{key:"maxWidth",name:c.MAX_WIDTH},{key:"minHeight",name:c.MIN_HEIGHT},{key:"maxHeight",name:c.MAX_HEIGHT}];function a1(e,n){var r;const t=e.boundVariables;if(t)for(const{key:i,name:o}of o1){const a=(r=t[i])==null?void 0:r.id;a&&n.push({layer:u(e),property:o,id:a})}}function i1(e,n){var r,i;const t=e.layoutGrids;if(Array.isArray(t))for(const o of t){const a=(i=(r=o.boundVariables)==null?void 0:r.color)==null?void 0:i.id;a&&n.push({layer:u(e),property:c.GRID_COLOR,id:a})}}function s1(e,n){var r,i;const t=(i=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:i.id;t&&n.push({layer:u(e),property:c.VISIBLE,id:t})}function l1(e,n){var o,a;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(o=t.textDecoration)==null?void 0:o.id,i=(a=t.textCase)==null?void 0:a.id;r&&n.push({layer:u(e),property:c.TEXT_DECORATION,id:r}),i&&n.push({layer:u(e),property:c.TEXT_CASE,id:i})}function C1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[i,o]of Object.entries(t))o!=null&&o.id&&n.push({layer:u(e),property:`Component / ${i}`,id:o.id})}function p1(e,n){var a;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const i=new Set,o=new Set;for(const s of t){const p=(a=s.boundVariables)==null?void 0:a.color;p!=null&&p.id&&!i.has(p.id)&&(o.add(p.id),i.add(p.id))}if(o.size>0){const s=Array.from(o)[0];n.push({layer:u(e),property:c.FILL,id:s}),o.size>1&&m.log(`${e.name} has ${o.size} fill variables, only the first is shown`)}}function c1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const o=(t=r.boundVariables)==null?void 0:t.color;o!=null&&o.id&&n.push({layer:u(e),property:c.STROKE_COLOR,id:o.id})}}function z(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function d1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function u1(e,n){var o,a;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const s of t)r[s.type]=((o=r[s.type])!=null?o:0)+1;const i={};for(const s of t){if(!s.boundVariables)continue;const l=r[s.type];i[s.type]=((a=i[s.type])!=null?a:0)+1;const p=i[s.type],d=z(s.type),C=l>1?`${d} ${p}`:d;for(const[b,g]of Object.entries(s.boundVariables))if(g.id){const v=d1(b,s.type);n.push({layer:u(e),property:`${C} ${b}`,id:g.id,effectGroup:C,subProp:v})}}}function f1(e,n){var a,s;const r=e.boundVariables;if(!r)return;const i=new Set(["color","fills","fills.0"]);for(const[l,p]of Object.entries(r)){if(i.has(l)||l.startsWith("fills."))continue;const d=p;if(d.id){const C=(a=V[l])!=null?a:l;n.push({layer:u(e),property:C,id:d.id})}}const o=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"];for(const l of o){const p=e,d=r[l];if(p[l]!==void 0&&(d!=null&&d.id)){const C=(s=V[l])!=null?s:l;n.push({layer:u(e),property:C,id:d.id})}}}function g1(e,n){var o;const t=e.boundVariables;if(!t)return;const r={fontSize:c.FONT_SIZE,fontWeight:c.FONT_WEIGHT,fontFamily:c.FONT_FAMILY,letterSpacing:c.LETTER_SPACING,lineHeight:c.LINE_HEIGHT,paragraphSpacing:c.PARAGRAPH_SPACING};for(const[a,s]of Object.entries(r)){const l=t[a];l!=null&&l.id&&(n.push({layer:u(e),property:s,id:l.id}),a==="fontSize"&&T.add(e.id))}const i={};j(t,i);for(const[a,s]of Object.entries(i)){let l=a;for(const[p,d]of Object.entries(r))if(a.includes(p)){l=d,p==="fontSize"&&T.add(e.id);break}l===a&&(l=(o=V[a])!=null?o:a);for(const p of s)n.push({layer:u(e),property:l,id:p})}}function j(e,n,t=[]){if(!(!e||typeof e!="object")){if(typeof e.id=="string"){const r=t.join(".");!r.startsWith("fills.")&&r!=="fills"&&(n[r]||(n[r]=[]),n[r].push(e.id));return}for(const r of Object.keys(e))r==="fills"||t.length>0&&t[0]==="fills"||j(e[r],n,[...t,r])}}function Y(e){const n=[];return p1(e,n),c1(e,n),u1(e,n),a1(e,n),i1(e,n),s1(e,n),e.type==="TEXT"&&(g1(e,n),l1(e,n)),e.type==="INSTANCE"&&C1(e,n),f1(e,n),n}function K(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children)}return n}const P=new Map,h1=10;async function O(e,n){var p,d;const t=[];let r=e;for(let C=0;C<h1;C++){t.push(r.name);const b=Object.keys((p=r.valuesByMode)!=null?p:{});if(b.length===0)break;const g=r.valuesByMode[b[0]];if(typeof g=="object"&&g!==null&&g.type==="VARIABLE_ALIAS"){const v=g.id,f=await figma.variables.getVariableByIdAsync(v);if(!f||f.id===r.id)break;r=f;continue}break}const i=t.length>1,o=await y1(r.variableCollectionId),a=r.name.split("/").filter(C=>C.length>0),s=(d=a.pop())!=null?d:r.name,l={collection:o,groups:a,name:s,isAlias:i};return n&&(l.library=m1(r)),i&&(l.aliasChain=t),l}async function y1(e){if(P.has(e))return P.get(e);const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)if(P.set(t.id,t.name),t.id===e)return t.name;return"Unknown collection"}function m1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function A(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=e.valuesByMode[n[0]];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function b1(){const e=new Map;return await v1(e),await L1(e),m.log("loadVariables: found",e.size,"variables"),e}async function v1(e){const n=await figma.variables.getLocalVariableCollectionsAsync();for(const t of n)for(const r of t.variableIds){const i=await figma.variables.getVariableByIdAsync(r);if(!i)continue;const o=await O(i,!1);e.set(r,{name:i.name,type:i.resolvedType,origin:"local",colorValue:A(i),path:o})}}async function L1(e){const n=figma.currentPage.selection,t=K(n),r=new Set;for(const i of t){const o=Y(i);for(const{id:a}of o)e.has(a)||r.add(a)}for(const i of r)try{const o=await figma.variables.getVariableByIdAsync(i);if(!o)continue;const a=await O(o,!0);if(e.set(i,{name:o.name,type:o.resolvedType,origin:"external",colorValue:A(o),path:a}),typeof figma.variables.importVariableByKeyAsync=="function"){const s=await figma.variables.importVariableByKeyAsync(o.key);if(s){const l=await O(s,!0);e.set(i,{name:s.name,type:s.resolvedType,origin:"external",colorValue:A(s),path:l})}}}catch(o){m.warn(`Failed to resolve variable ${i}:`,o)}}function k(e){return Number(e.toFixed(2)).toString()}function x1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function M1(e,n){var o,a,s,l,p,d;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const C of t)r[C.type]=((o=r[C.type])!=null?o:0)+1;const i={};for(const C of t){const b=r[C.type];i[C.type]=((a=i[C.type])!=null?a:0)+1;const g=i[C.type],v=z(C.type),f=b>1?`${v} ${g}`:v,L=C.type.includes("BLUR")||C.type.includes("SHADOW"),h=(s=C.boundVariables)!=null?s:{},x=u(e);if(typeof C.radius=="number"){const y=h.radius;if(!(y!=null&&y.id)){const I=L?"Blur":"Radius";n.push({layer:x,layerId:e.id,property:`${f} ${I}`,value:k(C.radius),effectGroup:f,subProp:I})}}if(C.type.includes("SHADOW")&&C.offset){const y=(l=h.offset)!=null?l:{};typeof C.offset.x=="number"&&!((p=y.x)!=null&&p.id)&&n.push({layer:x,layerId:e.id,property:`${f} Offset X`,value:k(C.offset.x),effectGroup:f,subProp:"Offset X"}),typeof C.offset.y=="number"&&!((d=y.y)!=null&&d.id)&&n.push({layer:x,layerId:e.id,property:`${f} Offset Y`,value:k(C.offset.y),effectGroup:f,subProp:"Offset Y"})}if(typeof C.spread=="number"){const y=h.spread;y!=null&&y.id||n.push({layer:x,layerId:e.id,property:`${f} Spread`,value:k(C.spread),effectGroup:f,subProp:"Spread"})}if(C.color){const y=h.color;y!=null&&y.id||n.push({layer:x,layerId:e.id,property:`${f} Color`,value:x1(C.color),effectGroup:f,subProp:"Color"})}}}function w(e){return Number(e.toFixed(2)).toString()}function $(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function w1(e,n){var t,r,i,o;if("fills"in e&&Array.isArray(e.fills))for(const a of e.fills){const s=a;!((r=(t=s.boundVariables)==null?void 0:t.color)!=null&&r.id)&&s.color&&n.push({layer:u(e),layerId:e.id,property:c.FILL,value:$(s.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let a;for(const s of e.strokes){const l=s;if(!((o=(i=l.boundVariables)==null?void 0:i.color)!=null&&o.id)&&l.color){a=l.color;break}}a&&!M(e.id,c.STROKE)&&(n.push({layer:u(e),layerId:e.id,property:c.STROKE,value:$(a)}),e.strokes.length>1&&m.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function I1(e,n){var r,i;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(i=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&i.id||M(e.id,c.OPACITY)||n.push({layer:u(e),layerId:e.id,property:c.OPACITY,value:w(t)})}function H1(e,n){var a,s,l,p,d,C,b;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((s=(a=t.strokes)==null?void 0:a.length)!=null?s:0)>0))return;const i=e.strokeWeight,o="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof i=="number"&&i!==0&&!((p=(l=e.boundVariables)==null?void 0:l.strokeWeight)!=null&&p.id)&&!o&&(M(e.id,c.STROKE_WEIGHT)||n.push({layer:u(e),layerId:e.id,property:c.STROKE_WEIGHT,value:w(i)}));for(const g of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(g in e))continue;const v=e[g];if(typeof v!="number"||v===0||(C=(d=e.boundVariables)==null?void 0:d[g])!=null&&C.id)continue;const f=(b=V[g])!=null?b:g;M(e.id,f)||n.push({layer:u(e),layerId:e.id,property:f,value:w(v)})}}function S1(e,n){var t,r,i,o,a;if("cornerRadius"in e){const s=e.cornerRadius,l="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof s=="number"&&s!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!l&&(M(e.id,c.CORNER_RADIUS)||n.push({layer:u(e),layerId:e.id,property:c.CORNER_RADIUS,value:w(s)}))}for(const s of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(s in e))continue;const l=e[s];if(typeof l!="number"||l===0||(o=(i=e.boundVariables)==null?void 0:i[s])!=null&&o.id)continue;const p=(a=V[s])!=null?a:s;M(e.id,p)||n.push({layer:u(e),layerId:e.id,property:p,value:w(l)})}}function E1(e,n){var i,o;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:c.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:c.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:c.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:c.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:a,displayName:s,skipIfProcessed:l}of r){if(l&&a==="fontSize"&&T.has(t.id))continue;const p=t[a];typeof p!="number"||p===0||(o=(i=e.boundVariables)==null?void 0:i[a])!=null&&o.id||M(e.id,s)||n.push({layer:u(e),layerId:e.id,property:s,value:w(p)})}}function V1(e,n){var r,i;const t=[{key:"paddingLeft",displayName:c.PADDING_LEFT},{key:"paddingRight",displayName:c.PADDING_RIGHT},{key:"paddingTop",displayName:c.PADDING_TOP},{key:"paddingBottom",displayName:c.PADDING_BOTTOM},{key:"itemSpacing",displayName:c.ITEM_SPACING}];for(const{key:o,displayName:a}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||(m.log(`Found spacing property ${o} = ${s} on node ${e.name}`),M(e.id,a)||n.push({layer:u(e),layerId:e.id,property:a,value:w(s)}))}}function N1(e,n){var r,i;const t=[{key:"minWidth",displayName:c.MIN_WIDTH},{key:"maxWidth",displayName:c.MAX_WIDTH},{key:"minHeight",displayName:c.MIN_HEIGHT},{key:"maxHeight",displayName:c.MAX_HEIGHT}];for(const{key:o,displayName:a}of t){if(!(o in e))continue;const s=e[o];typeof s!="number"||s===0||(i=(r=e.boundVariables)==null?void 0:r[o])!=null&&i.id||M(e.id,a)||n.push({layer:u(e),layerId:e.id,property:a,value:w(s)})}}function k1(e,n){const t=e;I1(t,n),H1(t,n),S1(t,n),E1(t,n),V1(t,n),N1(t,n)}function T1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const i=e;if(!i.mainComponent)return null;const o=i.mainComponent.id,a=((n=i.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?i.mainComponent.parent.id:"",s=JSON.stringify(W((t=i.componentProperties)!=null?t:{})),l=JSON.stringify(W((r=i.boundVariables)!=null?r:{}));return[o,a,s,l].join("|")}catch(i){return null}}function Z1(e){var t,r;const n=new Map;for(const i of e){const o=(t=T1(i))!=null?t:`__node__${i.id}`,a=(r=n.get(o))!=null?r:[];a.push(i),n.set(o,a)}return n}function W(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function P1(e){const n=new Set;for(const t of e.values())if(!(t.length<=1)&&t[0].type==="INSTANCE")for(let r=1;r<t.length;r++)R1(t[r],n);return n}function R1(e,n){const t=[e];for(;t.length>0;){const r=t.pop();n.add(r.id);const i=r.children;Array.isArray(i)&&t.push(...i)}}function O1(e,n,t){const r=Object.values(e).flat(),i=r.length,o=n.length,a=i+o,s=a===0?0:i/a,l={local:0,external:0},p={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)l[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(p[d.type]+=1);return{totalVariables:i,totalHardcoded:o,variableCoverage:s,byOrigin:l,byType:p,layerCount:Object.keys(e).length,scanDurationMs:t}}function A1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function B1(e,n,t){const r=new Map,i=async(a,s,l)=>{if(r.has(a))return;const p=await figma.getNodeByIdAsync(a);if(p){const d=t.get(a),C={id:a,name:s,order:l,type:A1(p)};d&&(C.count=d.count,C.mergedNodeIds=d.nodeIds),r.set(a,C)}};let o=0;for(const a of t.keys()){const s=await figma.getNodeByIdAsync(a);s&&await i(a,s.name,o++)}for(let a=0;a<e.length;a++){const s=e[a];await i(s.layerId,s.layer,o+a)}for(let a=0;a<n.length;a++){const s=n[a];await i(s.layerId,s.layer,o+e.length+a)}return r}function G1(e){var i;const n={};m.log(`Grouping ${e.length} usages by layer`);const t=new Map,r=[...e].sort((o,a)=>{const s=o.layer.localeCompare(a.layer);return s!==0?s:o.property.localeCompare(a.property)});for(const o of r){n[o.layerId]||(n[o.layerId]=[],t.set(o.layerId,new Set));const a=t.get(o.layerId),s=`${o.property}_${(i=o.id)!=null?i:""}`,l=D.some(p=>o.property.includes(p));m.log(`Layer: ${o.layer}, Property: ${o.property}, isSpacing: ${l}, isDuplicate: ${a.has(s)}`),(!a.has(s)||l)&&(n[o.layerId].push(o),a.add(s))}for(const[o,a]of Object.entries(n))m.log(`Layer ${o}: ${a.length} usages after grouping`);return n}async function R(){try{await _1()}catch(e){m.error("updateInspector error",e);const n={type:"error",message:String(e)};figma.ui.postMessage(n)}}async function _1(){var f;n1();const e=Date.now();figma.ui.postMessage({type:"scan-start"});const n=await b1(),t=figma.currentPage.selection,r=K(t),i=Z1(r),o=P1(i),a=[],s=[],l=new Map;for(const[,L]of i){const h=L[0];if(o.has(h.id))continue;L.length>1&&h.type==="INSTANCE"&&l.set(h.id,{count:L.length,nodeIds:L.map(I=>I.id)});const y=Y(h);for(const I of y){const{layer:B,property:G,id:N,effectGroup:_,subProp:F}=I,H=n.get(N);a.push(H?{layer:B,layerId:h.id,property:G,name:H.name,type:H.type,origin:H.origin,colorValue:H.colorValue,id:N,path:H.path,effectGroup:_,subProp:F}:{layer:B,layerId:h.id,property:G,name:N,type:"STRING",origin:"external",id:N,effectGroup:_,subProp:F})}w1(h,s),k1(h,s),M1(h,s)}const p=await B1(a,s,l),d=G1(a),C={};for(const L of r){if(L.type!=="INSTANCE")continue;const h=u(L),x=(f=C[h])!=null?f:[];x.push(L.id),C[h]=x}m.log("Final usages count:",a.length),m.log("Layers with variables:",Object.keys(d).length),m.log("Unbound usages count:",s.length),m.log("Total nodes in layerInfoMap:",p.size);const b=Date.now()-e,g=O1(d,s,b),v={type:"render",byLayer:d,unbound:s,layerInfoMap:Object.fromEntries(p),instancesByName:C,noVariablesFound:a.length===0&&s.length===0,stats:g,scanDurationMs:b};figma.ui.postMessage(v)}function F1(){figma.showUI(X.replace("</head>",`<style>${J}</style></head>`),{width:300,height:400,title:"Variable Inspector",themeColors:!0}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"&&R()};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{R()},300)}),R()}F1();

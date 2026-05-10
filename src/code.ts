@@ -7,8 +7,10 @@ import { SPACING_PROPERTY_KEYS } from './constants';
 import { resetDedupSets } from './dedup';
 import { loadVariables } from './variableLoader';
 import { inspectNode, collectAllNodes } from './nodeScanner';
+import { getLayerDisplayName } from './utils/displayName';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
 import { groupByFingerprint } from './instanceFingerprint';
+import { collectMergedAwayDescendantIds } from './mergedInstanceExclusion';
 import { logger } from './utils/logger';
 import { computeStats } from './ui/utils';
 
@@ -66,13 +68,25 @@ async function buildLayerInfoMap(
     }
   };
 
+  // Insert merged representatives first so that the UI fallback by name
+  // (ui.html) finds the representative entry — which carries count and
+  // mergedNodeIds — before any descendant entry sharing the same display
+  // name. Without this, unbound-only merged layers never render the × N
+  // badge because the fallback picks a descendant whose count is undefined.
+  let mergedOrder = 0;
+  for (const layerId of mergedInfo.keys()) {
+    const node = (await figma.getNodeByIdAsync(layerId)) as SceneNode | null;
+    if (node) {
+      await tryAdd(layerId, node.name, mergedOrder++);
+    }
+  }
   for (let idx = 0; idx < allUsages.length; idx++) {
     const u = allUsages[idx];
-    await tryAdd(u.layerId, u.layer, idx);
+    await tryAdd(u.layerId, u.layer, mergedOrder + idx);
   }
   for (let idx = 0; idx < unboundUsages.length; idx++) {
     const u = unboundUsages[idx];
-    await tryAdd(u.layerId, u.layer, allUsages.length + idx);
+    await tryAdd(u.layerId, u.layer, mergedOrder + allUsages.length + idx);
   }
 
   return layerInfoMap;
@@ -145,12 +159,14 @@ async function runInspector(): Promise<void> {
   const allNodes = collectAllNodes(selection);
 
   const groups = groupByFingerprint(allNodes);
+  const excluded = collectMergedAwayDescendantIds(groups);
   const allUsages: FullUsageEntry[] = [];
   const unboundUsages: UnboundUsage[] = [];
   const mergedInfo = new Map<string, { count: number; nodeIds: string[] }>();
 
   for (const [, bucket] of groups) {
     const representative = bucket[0];
+    if (excluded.has(representative.id)) continue;
     const isMerged = bucket.length > 1 && representative.type === 'INSTANCE';
 
     if (isMerged) {
@@ -178,6 +194,20 @@ async function runInspector(): Promise<void> {
   const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages, mergedInfo);
   const byLayer = groupUsagesByLayer(allUsages);
 
+  // Count INSTANCE nodes grouped by display name — independent of the
+  // fingerprint-based merge above. The UI uses this as a fallback to render
+  // the × N badge for layers whose instances do not share a fingerprint
+  // (e.g. different boundVariables on each instance) but still resolve to
+  // the same display name from the user's perspective.
+  const instancesByName: Record<string, string[]> = {};
+  for (const node of allNodes) {
+    if (node.type !== 'INSTANCE') continue;
+    const name = getLayerDisplayName(node);
+    const list = instancesByName[name] ?? [];
+    list.push(node.id);
+    instancesByName[name] = list;
+  }
+
   logger.log('Final usages count:', allUsages.length);
   logger.log('Layers with variables:', Object.keys(byLayer).length);
   logger.log('Unbound usages count:', unboundUsages.length);
@@ -191,6 +221,7 @@ async function runInspector(): Promise<void> {
     byLayer,
     unbound: unboundUsages,
     layerInfoMap: Object.fromEntries(layerInfoMap),
+    instancesByName,
     noVariablesFound: allUsages.length === 0 && unboundUsages.length === 0,
     stats,
     scanDurationMs,
@@ -207,6 +238,7 @@ function initializePlugin(): void {
     width: 300,
     height: 400,
     title: 'Variable Inspector',
+    themeColors: true,
   });
 
   figma.ui.onmessage = async (msg: UIToPluginMessage) => {

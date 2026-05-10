@@ -1,4 +1,4 @@
-import { createVariableTypeIcon, createPropertyIcon } from './ui.js';
+import { createVariableTypeIcon, createPropertyIcon, createLayerTypeIcon } from './ui.js';
 
 /**
  * Creates a variable pill element displaying the variable's type icon and name.
@@ -91,6 +91,11 @@ export function createLayerSection(layerInfo, variables) {
 
   const headerContent = document.createElement('div');
   headerContent.className = 'layer-header-content';
+
+  const layerIcon = createLayerTypeIcon(layerInfo.type);
+  if (layerIcon) {
+    headerContent.appendChild(layerIcon);
+  }
 
   const layerName = document.createElement('h2');
   layerName.textContent = layerInfo.name;

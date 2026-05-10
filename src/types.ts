@@ -86,6 +86,8 @@ export interface RenderMessage {
   unbound: UnboundUsage[];
   layerInfoMap: Record<string, LayerInfo>;
   noVariablesFound: boolean;
+  stats: ScanStats;
+  scanDurationMs: number;
 }
 
 /** Sent by the plugin thread when an unrecoverable error occurs. */

@@ -10,6 +10,7 @@ import { inspectNode, collectAllNodes } from './nodeScanner';
 import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
 import { groupByFingerprint } from './instanceFingerprint';
 import { logger } from './utils/logger';
+import { computeStats } from './ui/utils';
 
 /**
  * Determines the display layer type for a scene node.
@@ -132,6 +133,7 @@ async function updateInspector(): Promise<void> {
 
 async function runInspector(): Promise<void> {
   resetDedupSets();
+  const startMs = Date.now();
 
   const vars = await loadVariables();
   const selection = figma.currentPage.selection;
@@ -175,12 +177,17 @@ async function runInspector(): Promise<void> {
   logger.log('Unbound usages count:', unboundUsages.length);
   logger.log('Total nodes in layerInfoMap:', layerInfoMap.size);
 
+  const scanDurationMs = Date.now() - startMs;
+  const stats = computeStats(byLayer, unboundUsages, scanDurationMs);
+
   const msg: PluginToUIMessage = {
     type: 'render',
     byLayer,
     unbound: unboundUsages,
     layerInfoMap: Object.fromEntries(layerInfoMap),
     noVariablesFound: allUsages.length === 0 && unboundUsages.length === 0,
+    stats,
+    scanDurationMs,
   };
   figma.ui.postMessage(msg);
 }

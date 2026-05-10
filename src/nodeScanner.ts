@@ -5,6 +5,12 @@ import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
 import { processedFontSizeNodeIds } from './dedup';
 import { logger } from './utils/logger';
 import { getLayerDisplayName } from './utils/displayName';
+import {
+  scanDimensionConstraints,
+  scanLayoutGridColors,
+  scanVisibility,
+  scanTextDecoration,
+} from './propertyScanner';
 
 // Re-exported so existing imports from './nodeScanner' keep working.
 export { getLayerDisplayName };
@@ -249,9 +255,13 @@ export function inspectNode(node: SceneNode): VariableUsage[] {
   getColorUsages(node, usages);
   getStrokeUsages(node, usages);
   getEffectUsages(node, usages);
+  scanDimensionConstraints(node, usages);
+  scanLayoutGridColors(node, usages);
+  scanVisibility(node, usages);
 
   if (node.type === 'TEXT') {
     getTextNodeVariables(node as TextNode, usages);
+    scanTextDecoration(node as TextNode, usages);
   }
 
   getNodeBoundVariables(node, usages);

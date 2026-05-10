@@ -279,48 +279,10 @@ li {
   background-position: center;
 }
 
-.effect-groups-wrap {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.effect-group {
-  padding-left: 8px;
-  border-left: 2px solid #d0d8e0;
-}
-
-.effect-group h4 {
-  font-size: 12px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 4px 0;
-}
-
-.effect-subprops {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.effect-subprop {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  padding: 2px 4px;
-}
-
-.effect-subprop-label {
-  color: #666;
-  min-width: 60px;
-  font-weight: 500;
-}
-
-.effect-subprop.danger {
-  color: #8F0000;
-}
+/* Effect-group sub-prop rows reuse property-container; the .danger modifier
+   shifts the value pill to the unbound red palette. No new layout rules
+   needed — the existing property-sub-list / property-container / pill
+   styles already give the correct size, border, color and icon. */
 
 .alert-icon {
   display: inline-flex;

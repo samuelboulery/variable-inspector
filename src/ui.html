@@ -395,58 +395,81 @@
     }
 
     /**
-     * Renders one effect group block (e.g. "Drop Shadow 1") with its
-     * sub-props mixed (bound pills and unbound danger rows).
+     * Returns the base type name from an effectGroup label.
+     * "Drop Shadow 1" → "Drop Shadow", "Drop Shadow" → "Drop Shadow".
+     * Used to look up the matching property icon (Drop Shadow / Inner Shadow / etc.).
+     */
+    function effectGroupBaseType(label) {
+      return label.replace(/ \d+$/, '');
+    }
+
+    /**
+     * Renders one effect group as a property-group block matching the
+     * existing UI for grouped properties (property-group-title header +
+     * property-sub-list with property-container per sub-prop). Reuses the
+     * same DOM structure and classes as renderItemsList(isGroup) so the
+     * visual is consistent with the rest of the panel.
      */
     function renderEffectGroup(name, bound, unbound) {
-      const group = document.createElement('div');
-      group.className = 'effect-group';
+      const li = document.createElement('li');
 
-      const header = document.createElement('h4');
-      header.textContent = name;
-      group.appendChild(header);
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'property-group-title';
+      const icon = createPropertyIcon(effectGroupBaseType(name));
+      if (icon) groupTitle.appendChild(icon);
+      const titleText = document.createElement('span');
+      titleText.textContent = name;
+      groupTitle.appendChild(titleText);
+      li.appendChild(groupTitle);
 
-      const list = document.createElement('div');
-      list.className = 'effect-subprops';
+      const subList = document.createElement('ul');
+      subList.className = 'property-sub-list';
 
       const sortedBound = sortSubProps(bound);
       const sortedUnbound = sortSubProps(unbound);
 
       for (const b of sortedBound) {
-        list.appendChild(renderEffectSubPropRow(b.subProp || b.property, createVariablePill(b), false));
+        subList.appendChild(renderEffectSubPropRow(b.subProp || b.property, createVariablePill(b), false));
       }
       for (const u of sortedUnbound) {
-        list.appendChild(renderEffectSubPropRow(u.subProp || u.property, document.createTextNode(u.value), true));
+        const unboundPill = document.createElement('span');
+        unboundPill.className = 'variable-pill unbound-variable';
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = u.value;
+        unboundPill.appendChild(valueSpan);
+        subList.appendChild(renderEffectSubPropRow(u.subProp || u.property, unboundPill, true));
       }
 
-      group.appendChild(list);
-      return group;
+      li.appendChild(subList);
+      return li;
     }
 
-    function renderEffectSubPropRow(label, valueEl, danger) {
-      const row = document.createElement('div');
-      row.className = 'effect-subprop' + (danger ? ' danger' : '');
-      const labelEl = document.createElement('span');
-      labelEl.className = 'effect-subprop-label';
-      labelEl.textContent = label + ':';
-      row.appendChild(labelEl);
-      row.appendChild(valueEl);
-      return row;
+    function renderEffectSubPropRow(label, valueEl, _danger) {
+      const subLi = document.createElement('li');
+      const propContainer = document.createElement('div');
+      // Match the renderItemsList(isGroup) layout exactly: no .danger on the
+      // container so the row keeps the neutral spacing; the pill itself
+      // (variable-pill unbound-variable) carries the red palette and warning
+      // icon via .unbound-variable::before.
+      propContainer.className = 'property-container';
+      propContainer.appendChild(createPropertyElement(label));
+      propContainer.appendChild(valueEl);
+      subLi.appendChild(propContainer);
+      return subLi;
     }
 
     /**
-     * Renders all effect groups for one layer (bound + unbound mixed).
-     * Returns null if there's nothing to render so the caller can skip.
+     * Renders all effect groups for one layer as a single <ul> matching the
+     * outer panel structure. Returns null if nothing to render.
      */
     function renderEffectGroupsSection(boundEffects, unboundEffects) {
       if (boundEffects.length === 0 && unboundEffects.length === 0) return null;
-      const wrap = document.createElement('div');
-      wrap.className = 'effect-groups-wrap';
+      const ul = document.createElement('ul');
       const groups = groupEffectItems(boundEffects, unboundEffects);
       for (const [groupName, { bound, unbound }] of groups) {
-        wrap.appendChild(renderEffectGroup(groupName, bound, unbound));
+        ul.appendChild(renderEffectGroup(groupName, bound, unbound));
       }
-      return wrap;
+      return ul;
     }
 
     function renderItemsList(items, isUnbound = false) {

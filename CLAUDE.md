@@ -60,30 +60,29 @@ Never call Figma API from the UI thread.
 
 These are the required features. Any code change must not regress them.
 
-### 1 — Variables used in selection
+### 1 — Variables used in selection ✅ implemented
 Scan the entire node tree of the selection and collect every bound variable (color, float, string, boolean). Group results by layer, then by property type.
 
-### 2 — Non-variabilized properties
+### 2 — Non-variabilized properties ✅ implemented
 For each supported property that is hardcoded (not bound to a variable), report it as a warning with its raw value.
-Supported property families: fills, strokes, effects, text styles, spacing (padding, gap), corner radii, dimensions (width, height).
+Supported property families: fills, strokes, effects, text styles, spacing (padding, gap), corner radii, dimensions (width, height, min/max width/height), layoutGrids color, visible, textDecoration, textCase, componentProperties.
 
-### 3 — Variable path on click
-Clicking a variable pill must display its full resolution path: local collection → (library file if external) → variable group → variable name.
-This requires resolving `VariableAlias` chains.
+### 3 — Variable path on click ✅ implemented
+Clicking a variable pill displays its full resolution path: collection → (library file if external) → variable group → variable name. Alias chains are followed to the leaf (depth cap 10), the breadcrumb expands inline below the pill (single-open semantics), aliased variables are flagged with `(alias)`.
 
-### 4 — Sort by frame/component and by type
-Results must be organizable both by the containing frame/component and by property type (color, spacing, typography, etc.). Default sort: by frame hierarchy.
+### 4 — Sort by frame/component and by type ✅ implemented
+Toolbar segmented control toggles between `Par calque` (default) and `Par propriété`. State persisted in `localStorage` (key `vi.sortMode`).
 
-### 5 — Local vs external visual differentiation
-Variables from the current file's collections are **local**. Variables resolved from a linked library are **external**. Each must have a distinct visual treatment (badge, icon, or color accent).
+### 5 — Local vs external visual differentiation ✅ implemented
+Local variables: blue pill (`#e3f1ff` / `#1969d2`). External: purple pill (`#eee8ff` / `#6451cf`). Library name surfaced in the path breadcrumb on click.
 
-### 6 — One-click element targeting
-Every reported layer (variable or non-variabilized) must have a "focus" action: clicking it calls `figma.viewport.scrollAndZoomIntoView([node])` and sets `figma.currentPage.selection = [node]`.
+### 6 — One-click element targeting ✅ implemented
+Clicking a layer header zooms + selects via `figma.viewport.scrollAndZoomIntoView([node])` + `figma.currentPage.selection = [node]`. Merged instance sections expose a `× N` badge that cycles selection between the merged nodes on click.
 
-### 7 — Duplicate handling
-- **Identical instances** (same component, same props, same variabilization) → merge into a single row and show a count badge.
-- **Divergent instances** (same component, different variabilization) → show as separate rows, never merge.
-- **Repeated properties** within one node (e.g., multiple Drop Shadows) → label them `Drop Shadow 1`, `Drop Shadow 2`, etc. with individual values.
+### 7 — Duplicate handling ✅ implemented
+- **Identical instances** (same component, same props, same variabilization) → merged via `instanceFingerprint`. Single row with `× N` count badge that cycles selection across the merged nodes on click.
+- **Divergent instances** (same component, different variabilization) → fingerprints differ → separate rows.
+- **Repeated effect properties** within one node (e.g., multiple Drop Shadows) → labeled `Drop Shadow 1`, `Drop Shadow 2`, etc. (single effect of its type stays unnumbered).
 
 ## Code Quality Rules
 

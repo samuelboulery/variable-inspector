@@ -1,4 +1,4 @@
-const o1=`<!DOCTYPE html>
+const s1=`<!DOCTYPE html>
 <html>
 
 <head>
@@ -177,15 +177,27 @@ const o1=`<!DOCTYPE html>
 
     let sortModeMemory = 'byLayer';
     let filterMemory = { search: '', types: [], origins: [] };
+    // True once the user has explicitly picked a view mode. Until then, the
+    // first render auto-picks 'overview' for big selections so the dashboard
+    // surfaces upfront on heavy boards.
+    let sortModeUserChosen = false;
 
     function getSortMode() {
       try {
         const v = localStorage.getItem(SORT_KEY);
-        if (v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
+        if (v === 'overview' || v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
       } catch (_) { /* data: URL — fallback below */ }
       return sortModeMemory;
     }
     function setSortMode(mode) {
+      sortModeMemory = mode;
+      sortModeUserChosen = true;
+      try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
+    }
+    // Used by the auto-pick logic on the first render: sets the mode without
+    // marking it as a user-driven choice, so a later large selection can still
+    // re-pick overview.
+    function setSortModeAuto(mode) {
       sortModeMemory = mode;
       try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
     }
@@ -718,6 +730,7 @@ const o1=`<!DOCTYPE html>
         </div>
         <div class="toolbar-row">
           <div class="fg-seg">
+            <button data-mode="overview">Aperçu</button>
             <button data-mode="byLayer">Calque</button>
             <button data-mode="byProperty">Propriété</button>
             <button data-mode="unbound">Unbound</button>
@@ -754,6 +767,14 @@ const o1=`<!DOCTYPE html>
         if (btn.dataset.mode === currentSort) btn.classList.add('active');
         btn.addEventListener('click', () => {
           if (btn.dataset.mode === getSortMode()) return;
+          // Manual mode switch = clean navigation. Clear any leftover search
+          // (drill-downs or stale typing) so onglet bascule shows everything.
+          // Chips type/origin restent — l'utilisateur les pose explicitement.
+          const cur = getFilterState();
+          if (cur.search) {
+            cur.search = '';
+            setFilterState(cur);
+          }
           setSortMode(btn.dataset.mode);
           if (lastRender) handlePluginMessage(lastRender);
         });
@@ -807,10 +828,10 @@ const o1=`<!DOCTYPE html>
     }
 
     // Applique le filter state à une entry unbound. Les unbound n'ont pas de
-    // type/origin (toujours hardcodé) — on ne filtre que par search sur layer
-    // + property + value. Les chips type/origin actifs masquent les unbound.
+    // type/origin (toujours hardcodé), donc les chips type/origin ne s'y
+    // appliquent pas — sinon l'onglet Unbound serait vide dès qu'un chip est
+    // actif. Seul le search filtre les unbound, sur layer + property + value.
     function matchesFilterUnbound(layer, item, filter) {
-      if (filter.types.length > 0 || filter.origins.length > 0) return false;
       const q = (filter.search || '').trim().toLowerCase();
       if (!q) return true;
       const hay = \`\${layer || ''} \${item.property || ''} \${String(item.value || '')}\`.toLowerCase();
@@ -851,6 +872,331 @@ const o1=`<!DOCTYPE html>
         </div>
       \`;
       return dashboard;
+    }
+
+    // ------------------------------------------------------------------
+    // Overview / dashboard view (sortMode === 'overview')
+    // ------------------------------------------------------------------
+
+    // Builds an SVG coverage donut. radius/stroke kept simple so the
+    // computation is exact: arc length = 2πr × pct.
+    function buildCoverageDonut(coveragePct, size = 64) {
+      const r = (size / 2) - 6;
+      const c = 2 * Math.PI * r;
+      const arc = (coveragePct / 100) * c;
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', \`0 0 \${size} \${size}\`);
+      svg.setAttribute('width', size);
+      svg.setAttribute('height', size);
+      svg.classList.add('overview-donut');
+      const track = document.createElementNS(ns, 'circle');
+      track.setAttribute('cx', size / 2);
+      track.setAttribute('cy', size / 2);
+      track.setAttribute('r', r);
+      track.setAttribute('fill', 'none');
+      track.setAttribute('stroke', 'var(--overview-donut-track, #e6e6e6)');
+      track.setAttribute('stroke-width', '6');
+      const arcEl = document.createElementNS(ns, 'circle');
+      arcEl.setAttribute('cx', size / 2);
+      arcEl.setAttribute('cy', size / 2);
+      arcEl.setAttribute('r', r);
+      arcEl.setAttribute('fill', 'none');
+      arcEl.setAttribute('stroke', 'var(--overview-donut-arc, #1969d2)');
+      arcEl.setAttribute('stroke-width', '6');
+      arcEl.setAttribute('stroke-linecap', 'round');
+      arcEl.setAttribute('stroke-dasharray', \`\${arc} \${c}\`);
+      arcEl.setAttribute('transform', \`rotate(-90 \${size / 2} \${size / 2})\`);
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', size / 2);
+      label.setAttribute('y', size / 2 + 4);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '14');
+      label.setAttribute('font-weight', '600');
+      label.setAttribute('fill', 'currentColor');
+      label.textContent = \`\${coveragePct}%\`;
+      svg.appendChild(track);
+      svg.appendChild(arcEl);
+      svg.appendChild(label);
+      return svg;
+    }
+
+    // Builds one "top hardcoded value" row. The pill mimics the unbound
+    // pill colours from the details list to reinforce visual mapping.
+    function renderTopHardcodedRow(item) {
+      const row = document.createElement('div');
+      row.className = 'overview-top-row';
+      const label = document.createElement('div');
+      label.className = 'overview-top-label';
+      const prop = document.createElement('span');
+      prop.className = 'overview-top-property';
+      prop.textContent = item.property;
+      const value = document.createElement('span');
+      value.className = 'overview-top-value';
+      value.textContent = item.value;
+      const count = document.createElement('span');
+      count.className = 'overview-top-count';
+      count.textContent = \`× \${item.count}\`;
+      label.appendChild(prop);
+      label.appendChild(value);
+      label.appendChild(count);
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'overview-top-action';
+      action.textContent = 'Sélectionner';
+      action.title = \`Sélectionner les \${item.nodeIds.length} nœuds dans la canvas\`;
+      action.addEventListener('click', () => {
+        parent.postMessage({
+          pluginMessage: { type: 'select-nodes', nodeIds: item.nodeIds },
+        }, '*');
+      });
+      row.appendChild(label);
+      row.appendChild(action);
+      return row;
+    }
+
+    // Mirrors computePropertyHealth() in src/ui/utils.ts. Duplicated here
+    // because ui.html is a static script — it cannot import the TS module.
+    // The TS version is the source of truth and has unit tests; keep them
+    // in sync if the contract changes.
+    function computePropertyHealthInline(byProperty, minTotal) {
+      const min = typeof minTotal === 'number' ? minTotal : 5;
+      let allBound = 0, partial = 0, allUnbound = 0;
+      for (const p of byProperty) {
+        const total = p.bound + p.unbound;
+        if (total === 0) continue;
+        if (p.unbound === 0) allBound += 1;
+        else if (p.bound === 0) allUnbound += 1;
+        else partial += 1;
+      }
+      const pool = byProperty.filter(p => (p.bound + p.unbound) >= min);
+      const candidates = pool.length > 0 ? pool : byProperty.filter(p => (p.bound + p.unbound) > 0);
+      const ratio = p => p.bound / (p.bound + p.unbound);
+      let best = null, worst = null;
+      for (const p of candidates) {
+        if (best === null || ratio(p) > ratio(best)) best = p;
+        if (worst === null || ratio(p) < ratio(worst)) worst = p;
+      }
+      return { allBound, partial, allUnbound, best, worst };
+    }
+
+    // Origin distribution mini-bar : single horizontal bar split local/external.
+    function renderOriginBar(stats) {
+      const local = stats.byOrigin.local || 0;
+      const external = stats.byOrigin.external || 0;
+      const total = local + external;
+      const pct = total === 0 ? 0 : Math.round((local / total) * 100);
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-distrib-row';
+      wrap.innerHTML = \`
+        <span class="overview-distrib-label">Origine</span>
+        <span class="overview-distrib-bar" role="presentation">
+          <span class="overview-distrib-bar-fill" style="width:\${pct}%"></span>
+        </span>
+        <span class="overview-distrib-meta">
+          <span class="overview-origin-local">\${local} local</span>
+          · <span class="overview-origin-external">\${external} ext.</span>
+        </span>
+      \`;
+      return wrap;
+    }
+
+    // Types breakdown : 4 small chips with counts. Hides zero-count types so
+    // we never show "Boolean 0" noise.
+    function renderTypesBreakdown(stats) {
+      const types = [
+        { key: 'COLOR', label: 'Color' },
+        { key: 'FLOAT', label: 'Float' },
+        { key: 'STRING', label: 'String' },
+        { key: 'BOOLEAN', label: 'Bool' },
+      ];
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-distrib-row overview-distrib-types';
+      const label = document.createElement('span');
+      label.className = 'overview-distrib-label';
+      label.textContent = 'Types';
+      wrap.appendChild(label);
+      const list = document.createElement('span');
+      list.className = 'overview-types-list';
+      let anyShown = false;
+      for (const t of types) {
+        const count = stats.byType[t.key] || 0;
+        if (count === 0) continue;
+        anyShown = true;
+        const chip = document.createElement('span');
+        chip.className = \`overview-type-chip overview-type-\${t.key.toLowerCase()}\`;
+        chip.innerHTML = \`<strong>\${count}</strong> \${t.label}\`;
+        list.appendChild(chip);
+      }
+      if (!anyShown) {
+        const empty = document.createElement('span');
+        empty.className = 'overview-distrib-meta';
+        empty.textContent = 'Aucune variable';
+        wrap.appendChild(empty);
+      } else {
+        wrap.appendChild(list);
+      }
+      return wrap;
+    }
+
+    // 3-segment health bar : fully bound / partial / fully hardcoded counts
+    // across all properties. The legend below echoes the segment colours.
+    function renderHealthBar(health) {
+      const total = health.allBound + health.partial + health.allUnbound;
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-health';
+      const bar = document.createElement('div');
+      bar.className = 'overview-health-bar';
+      const seg = (cls, n) => {
+        const s = document.createElement('span');
+        s.className = \`overview-health-seg \${cls}\`;
+        s.style.width = total === 0 ? '0%' : \`\${(n / total) * 100}%\`;
+        s.title = \`\${n} propriété\${n > 1 ? 's' : ''}\`;
+        return s;
+      };
+      bar.appendChild(seg('overview-health-bound', health.allBound));
+      bar.appendChild(seg('overview-health-partial', health.partial));
+      bar.appendChild(seg('overview-health-unbound', health.allUnbound));
+      wrap.appendChild(bar);
+      const legend = document.createElement('div');
+      legend.className = 'overview-health-legend';
+      legend.innerHTML = \`
+        <span class="overview-health-legend-item overview-health-bound"><strong>\${health.allBound}</strong> entièrement bound</span>
+        <span class="overview-health-legend-item overview-health-partial"><strong>\${health.partial}</strong> partielle\${health.partial > 1 ? 's' : ''}</span>
+        <span class="overview-health-legend-item overview-health-unbound"><strong>\${health.allUnbound}</strong> entièrement hardcodée\${health.allUnbound > 1 ? 's' : ''}</span>
+      \`;
+      wrap.appendChild(legend);
+      return wrap;
+    }
+
+    // Two highlight rows : best / worst property by coverage ratio. Skip
+    // entirely when both extremes are null (no property has bound + unbound).
+    function renderBestWorstProperty(health) {
+      if (!health.best && !health.worst) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-extremes';
+      const pct = p => {
+        const t = p.bound + p.unbound;
+        return t === 0 ? 0 : Math.round((p.bound / t) * 100);
+      };
+      if (health.best) {
+        const row = document.createElement('div');
+        row.className = 'overview-extreme-row overview-extreme-best';
+        row.innerHTML = \`
+          <span class="overview-extreme-icon">✓</span>
+          <span class="overview-extreme-label">Meilleure</span>
+          <span class="overview-extreme-name">\${escapeHtml(health.best.property)}</span>
+          <span class="overview-extreme-score">\${pct(health.best)}% bound (\${health.best.bound}/\${health.best.bound + health.best.unbound})</span>
+        \`;
+        wrap.appendChild(row);
+      }
+      // Avoid showing the same property twice when it is both best and worst.
+      if (health.worst && health.worst !== health.best) {
+        const row = document.createElement('div');
+        row.className = 'overview-extreme-row overview-extreme-worst';
+        row.innerHTML = \`
+          <span class="overview-extreme-icon">!</span>
+          <span class="overview-extreme-label">À fixer</span>
+          <span class="overview-extreme-name">\${escapeHtml(health.worst.property)}</span>
+          <span class="overview-extreme-score">\${pct(health.worst)}% bound (\${health.worst.bound}/\${health.worst.bound + health.worst.unbound})</span>
+        \`;
+        wrap.appendChild(row);
+      }
+      return wrap;
+    }
+
+    // Top-level overview renderer. 4 blocks max, scaled to selection size :
+    //  - compact (≤ 10 layers)  : bloc 1 seul
+    //  - medium  (11–50 layers) : blocs 1 + 2
+    //  - full    (> 50 layers)  : blocs 1 + 2 + 3 + 4
+    function renderOverview(container, stats) {
+      const wrap = document.createElement('div');
+      wrap.className = 'overview';
+      const density = stats.layerCount > 50 ? 'full' : stats.layerCount > 10 ? 'medium' : 'compact';
+      wrap.dataset.density = density;
+      const coveragePct = Math.round((stats.variableCoverage || 0) * 100);
+
+      // Bloc 1 — Coverage header (always).
+      const header = document.createElement('div');
+      header.className = 'overview-header';
+      header.appendChild(buildCoverageDonut(coveragePct, density === 'compact' ? 44 : 72));
+      const counters = document.createElement('div');
+      counters.className = 'overview-counters';
+      const merged = stats.instanceMergedCount || 0;
+      const mergedSuffix = merged > 0 ? \` · \${merged} instance\${merged > 1 ? 's' : ''} dédup.\` : '';
+      const scanLine = typeof stats.scanDurationMs === 'number'
+        ? \`<div class="overview-counter-sub">Scan : \${(stats.scanDurationMs / 1000).toFixed(stats.scanDurationMs >= 1000 ? 1 : 2)} s</div>\`
+        : '';
+      counters.innerHTML = \`
+        <div class="overview-counter-main">
+          <strong>\${stats.totalVariables}</strong> variables
+          · <strong>\${stats.totalHardcoded}</strong> hardcodées
+        </div>
+        <div class="overview-counter-sub">
+          \${stats.layerCount} calque\${stats.layerCount > 1 ? 's' : ''}\${mergedSuffix}
+        </div>
+        \${scanLine}
+      \`;
+      header.appendChild(counters);
+      wrap.appendChild(header);
+
+      if (density === 'compact') {
+        container.appendChild(wrap);
+        return;
+      }
+
+      // Bloc 2 — Distribution (origine + types).
+      const distrib = document.createElement('section');
+      distrib.className = 'overview-section overview-distrib';
+      distrib.appendChild(renderOriginBar(stats));
+      distrib.appendChild(renderTypesBreakdown(stats));
+      wrap.appendChild(distrib);
+
+      if (density === 'medium') {
+        container.appendChild(wrap);
+        return;
+      }
+
+      // Bloc 3 — Santé par propriété (full only).
+      const byProperty = stats.byProperty || [];
+      if (byProperty.length > 0) {
+        const health = computePropertyHealthInline(byProperty);
+        const healthSection = document.createElement('section');
+        healthSection.className = 'overview-section';
+        const healthTitle = document.createElement('h3');
+        healthTitle.className = 'overview-section-title';
+        healthTitle.textContent = 'Santé par propriété';
+        healthSection.appendChild(healthTitle);
+        healthSection.appendChild(renderHealthBar(health));
+        const extremes = renderBestWorstProperty(health);
+        if (extremes) healthSection.appendChild(extremes);
+        wrap.appendChild(healthSection);
+      }
+
+      // Bloc 4 — Top valeurs hardcodées (full only).
+      const top = stats.topHardcoded || [];
+      if (top.length > 0) {
+        const topSection = document.createElement('section');
+        topSection.className = 'overview-section';
+        const topTitle = document.createElement('h3');
+        topTitle.className = 'overview-section-title';
+        topTitle.textContent = 'Valeurs hardcodées récurrentes';
+        topSection.appendChild(topTitle);
+        const topList = document.createElement('div');
+        topList.className = 'overview-top';
+        // Cap at 5 in the overview to stay synthetic — full list is in the
+        // Unbound tab.
+        for (const item of top.slice(0, 5)) topList.appendChild(renderTopHardcodedRow(item));
+        topSection.appendChild(topList);
+        wrap.appendChild(topSection);
+      } else if (stats.totalHardcoded === 0) {
+        const ok = document.createElement('div');
+        ok.className = 'overview-empty-hint overview-empty-success';
+        ok.textContent = '✓ Aucune valeur hardcodée détectée.';
+        wrap.appendChild(ok);
+      }
+
+      container.appendChild(wrap);
     }
 
     // Rendu alternatif "Par propriété" : flatten bound entries across layers,
@@ -948,6 +1294,31 @@ const o1=`<!DOCTYPE html>
       }
     }
 
+    // Removes the progress bar set up by ensureScanProgressBar(). Called on
+    // every full render and on errors so the bar never lingers.
+    function clearScanProgressBar() {
+      const existing = document.getElementById('vi-scan-progress');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    }
+
+    // Lazily mounts the live scan progress strip at the top of #app. Returns
+    // the strip element so callers can update its width/label in-place.
+    function ensureScanProgressBar() {
+      let strip = document.getElementById('vi-scan-progress');
+      if (strip) return strip;
+      const app = document.getElementById('app');
+      if (!app) return null;
+      strip = document.createElement('div');
+      strip.id = 'vi-scan-progress';
+      strip.className = 'vi-scan-progress';
+      strip.innerHTML = \`
+        <div class="vi-scan-progress-bar"><span class="vi-scan-progress-fill" style="width:0%"></span></div>
+        <div class="vi-scan-progress-meta">Scan…</div>
+      \`;
+      app.insertBefore(strip, app.firstChild || null);
+      return strip;
+    }
+
     function handlePluginMessage(msg) {
       if (!msg) return;
 
@@ -956,6 +1327,29 @@ const o1=`<!DOCTYPE html>
       // précédent reste affiché pendant le scan.
       if (msg.type === 'scan-start') {
         document.querySelectorAll('.fg-rescan').forEach(b => b.classList.add('scanning'));
+        const strip = ensureScanProgressBar();
+        if (strip) {
+          const fill = strip.querySelector('.vi-scan-progress-fill');
+          if (fill) fill.style.width = '4%';
+          const meta = strip.querySelector('.vi-scan-progress-meta');
+          if (meta) meta.textContent = 'Scan en cours…';
+        }
+        return;
+      }
+
+      // Partial render : live progress + rolling counters during a long scan.
+      // Doesn't touch the main content area — the previous render stays put.
+      if (msg.type === 'partial-render') {
+        const strip = ensureScanProgressBar();
+        if (!strip) return;
+        const pct = Math.max(0, Math.min(100, Math.round((msg.progress || 0) * 100)));
+        const fill = strip.querySelector('.vi-scan-progress-fill');
+        if (fill) fill.style.width = \`\${pct}%\`;
+        const meta = strip.querySelector('.vi-scan-progress-meta');
+        if (meta) {
+          const p = msg.statsPreview || {};
+          meta.textContent = \`\${pct}% · \${p.totalVariables || 0} liées · \${p.totalHardcoded || 0} hardcodées · \${p.layerCount || 0} calques\`;
+        }
         return;
       }
 
@@ -998,6 +1392,17 @@ const o1=`<!DOCTYPE html>
 
       lastRender = msg;
       let { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
+
+      // Auto-pick the Overview tab on the first render of a heavy selection
+      // so the dashboard surfaces upfront. Once the user picks a mode (via
+      // setSortMode), this auto-pick stays out of the way.
+      if (!sortModeUserChosen && stats && stats.layerCount > 50) {
+        setSortModeAuto('overview');
+      } else if (!sortModeUserChosen && stats && stats.layerCount <= 10 && getSortMode() === 'overview') {
+        // Symmetric: a tiny selection on a fresh session shouldn't be stuck
+        // on overview (it would feel empty). Fall back to byLayer.
+        setSortModeAuto('byLayer');
+      }
       // Dedup unbound entries within each layer name by
       // (effectGroup, subProp, property, value) tuple. Multiple identical
       // instances of a component (whether or not the plugin merged them via
@@ -1057,6 +1462,14 @@ const o1=`<!DOCTYPE html>
           <p>Sélectionnez un élément avec des propriétés à inspecter.</p>
         \`;
         container.appendChild(emptyMessage);
+        return;
+      }
+
+      // Overview tab short-circuits the list pipeline entirely : the
+      // dashboard owns the full content area. Toolbar above is enough for
+      // navigation back to the detail tabs.
+      if (getSortMode() === 'overview' && stats) {
+        renderOverview(container, stats);
         return;
       }
 
@@ -1349,7 +1762,7 @@ const o1=`<!DOCTYPE html>
   <\/script>
 </body>
 
-</html>`,i1=`:root {
+</html>`,l1=`:root {
   --fg-accent: #0d99ff;
   --fg-text: #1e1e1e;
   --fg-text-secondary: #555555;
@@ -2068,5 +2481,416 @@ html.figma-dark .unbound-variable::before {
 .fg-chip.active {
   background: var(--fg-accent);
   color: #fff;
-}`,p={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},k={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},K=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"],a1=200,U=8e3,s1=10,l1=20,C1=250;function c1(){try{return typeof process!="undefined"&&!0}catch(e){return!1}}const F=c1(),x={log:(...e)=>{F||console.log(...e)},warn:(...e)=>{F||console.warn(...e)},error:(...e)=>{F||console.error(...e)}},O=new Set,N=new Set;function p1(e,n,t){return`${e}|${n}`}function d1(){O.clear(),N.clear()}function M(e,n,t){const r=p1(e,n);return x.log(`Checking property: ${r}, propertyName: ${n}, exists: ${N.has(r)}`),K.some(i=>n.includes(i))?(x.log(`Skipping deduplication for spacing property: ${n}`),N.add(r),!1):N.has(r)?!0:(N.add(r),!1)}const E=/^I?\d+:\d+(;\d+:\d+)*$/,u1=/^I(\d+:\d+)/;function X(e){var t;const n=e.mainComponent;return n?((t=n.parent)==null?void 0:t.type)==="COMPONENT_SET"&&!E.test(n.parent.name)?n.parent.name:E.test(n.name)?null:n.name:null}function J(e,n){var o;let t=e,r=0;for(;t&&r<n;){const i=t.name;if(typeof i=="string"&&!E.test(i)&&t.type!=="PAGE"&&t.type!=="DOCUMENT")return i;t=(o=t.parent)!=null?o:null,r++}return null}function f1(e){const n=u1.exec(e);if(!n)return null;const t=n[1];if(!t)return null;const r=figma.getNodeById(t);if(!r)return null;if(!E.test(r.name))return r.name;if(r.type==="INSTANCE"){const o=X(r);if(o)return o}return J(r.parent,5)}function h(e){if(!E.test(e.name))return e.name;if(e.type==="INSTANCE"){const r=X(e);if(r)return r}if(e.type==="COMPONENT"){const r=e.parent;if((r==null?void 0:r.type)==="COMPONENT_SET"&&!E.test(r.name))return r.name}const n=J(e.parent,10);if(n)return n;const t=f1(e.name);return t||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const g1=[{key:"minWidth",name:p.MIN_WIDTH},{key:"maxWidth",name:p.MAX_WIDTH},{key:"minHeight",name:p.MIN_HEIGHT},{key:"maxHeight",name:p.MAX_HEIGHT}];function h1(e,n){var r;const t=e.boundVariables;if(t)for(const{key:o,name:i}of g1){const s=(r=t[o])==null?void 0:r.id;s&&n.push({layer:h(e),property:i,id:s})}}function m1(e,n){var r,o;const t=e.layoutGrids;if(Array.isArray(t))for(const i of t){const s=(o=(r=i.boundVariables)==null?void 0:r.color)==null?void 0:o.id;s&&n.push({layer:h(e),property:p.GRID_COLOR,id:s})}}function y1(e,n){var r,o;const t=(o=(r=e.boundVariables)==null?void 0:r.visible)==null?void 0:o.id;t&&n.push({layer:h(e),property:p.VISIBLE,id:t})}function b1(e,n){var i,s;if(e.type!=="TEXT")return;const t=e.boundVariables;if(!t)return;const r=(i=t.textDecoration)==null?void 0:i.id,o=(s=t.textCase)==null?void 0:s.id;r&&n.push({layer:h(e),property:p.TEXT_DECORATION,id:r}),o&&n.push({layer:h(e),property:p.TEXT_CASE,id:o})}function v1(e,n){var r;if(e.type!=="INSTANCE")return;const t=(r=e.boundVariables)==null?void 0:r.componentProperties;if(t)for(const[o,i]of Object.entries(t))i!=null&&i.id&&n.push({layer:h(e),property:`Component / ${o}`,id:i.id})}function L1(e,n){var s;const t=[];"fills"in e&&Array.isArray(e.fills)&&t.push(...e.fills);const r=e;Array.isArray(r.backgrounds)&&t.push(...r.backgrounds);const o=new Set,i=new Set;for(const a of t){const C=(s=a.boundVariables)==null?void 0:s.color;C!=null&&C.id&&!o.has(C.id)&&(i.add(C.id),o.add(C.id))}if(i.size>0){const a=Array.from(i)[0];a&&n.push({layer:h(e),property:p.FILL,id:a}),i.size>1&&x.log(`${e.name} has ${i.size} fill variables, only the first is shown`)}}function x1(e,n){var t;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const r of e.strokes){const i=(t=r.boundVariables)==null?void 0:t.color;i!=null&&i.id&&n.push({layer:h(e),property:p.STROKE_COLOR,id:i.id})}}function Q(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function M1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function w1(e,n){var i,s,a;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const l of t)r[l.type]=((i=r[l.type])!=null?i:0)+1;const o={};for(const l of t){if(!l.boundVariables)continue;const C=(s=r[l.type])!=null?s:0;o[l.type]=((a=o[l.type])!=null?a:0)+1;const d=o[l.type],f=Q(l.type),c=C>1?`${f} ${d}`:f;for(const[y,b]of Object.entries(l.boundVariables)){const v=B(b);if(v){const m=M1(y,l.type);n.push({layer:h(e),property:`${c} ${y}`,id:v,effectGroup:c,subProp:m})}}}}function I1(e,n){var a,l;const r=e.boundVariables;if(!r)return;const o=new Set(["color","fills","fills.0"]);for(const[C,d]of Object.entries(r)){if(o.has(C)||C.startsWith("fills."))continue;const f=B(d);if(f){const c=(a=k[C])!=null?a:C;n.push({layer:h(e),property:c,id:f})}}const i=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"],s=e;for(const C of i){const d=r[C],f=B(d);if(s[C]!==void 0&&f){const c=(l=k[C])!=null?l:C;n.push({layer:h(e),property:c,id:f})}}}function B(e){if(e===null||typeof e!="object")return;const n=e.id;return typeof n=="string"?n:void 0}function S1(e,n){var i;const t=e.boundVariables;if(!t)return;const r={fontSize:p.FONT_SIZE,fontWeight:p.FONT_WEIGHT,fontFamily:p.FONT_FAMILY,letterSpacing:p.LETTER_SPACING,lineHeight:p.LINE_HEIGHT,paragraphSpacing:p.PARAGRAPH_SPACING};for(const[s,a]of Object.entries(r)){const l=B(t[s]);l&&(n.push({layer:h(e),property:a,id:l}),s==="fontSize"&&O.add(e.id))}const o={};H1(t,o);for(const[s,a]of Object.entries(o)){let l=s;for(const[C,d]of Object.entries(r))if(s.includes(C)){l=d,C==="fontSize"&&O.add(e.id);break}l===s&&(l=(i=k[s])!=null?i:s);for(const C of a)n.push({layer:h(e),property:l,id:C})}}function H1(e,n){var o;if(!e||typeof e!="object")return;const t=[{value:e,path:[]}],r=new WeakSet;for(;t.length>0;){const i=t.pop();if(!i)continue;const{value:s,path:a}=i;if(s===null||typeof s!="object"||a.length>l1||r.has(s))continue;r.add(s);const l=s.id;if(typeof l=="string"){const C=a.join(".");if(!C.startsWith("fills.")&&C!=="fills"){const d=(o=n[C])!=null?o:[];d.push(l),n[C]=d}continue}for(const C of Object.keys(s))C==="fills"||a.length>0&&a[0]==="fills"||t.push({value:s[C],path:[...a,C]})}}function e1(e){const n=[];return L1(e,n),x1(e,n),w1(e,n),h1(e,n),m1(e,n),y1(e,n),e.type==="TEXT"&&(S1(e,n),b1(e,n)),e.type==="INSTANCE"&&v1(e,n),I1(e,n),n}function n1(e){const n=[],t=[...e];for(;t.length>0;){const r=t.pop();r&&(n.push(r),"children"in r&&Array.isArray(r.children)&&t.push(...r.children))}return n}let A=null,T=null;async function $(e,n){var C,d;const t=[];let r=e;for(let f=0;f<s1;f++){t.push(r.name);const c=Object.keys((C=r.valuesByMode)!=null?C:{});if(c.length===0)break;const y=c[0];if(y===void 0)break;const b=r.valuesByMode[y];if(typeof b=="object"&&b!==null&&b.type==="VARIABLE_ALIAS"){const v=b.id,m=await figma.variables.getVariableByIdAsync(v);if(!m||m.id===r.id)break;r=m;continue}break}const o=t.length>1,i=await E1(r.variableCollectionId),s=r.name.split("/").filter(f=>f.length>0),a=(d=s.pop())!=null?d:r.name,l={collection:i,groups:s,name:a,isAlias:o};return n&&(l.library=N1(r)),o&&(l.aliasChain=t),l}async function E1(e){var t;return(t=(await V1()).get(e))!=null?t:"Unknown collection"}async function V1(){return A||T||(T=(async()=>{const e=await figma.variables.getLocalVariableCollectionsAsync(),n=new Map;for(const t of e)n.set(t.id,t.name);return A=n,n})(),T)}function N1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function T1(){A=null,T=null}function W(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const t=n[0];if(t===void 0)return;const r=e.valuesByMode[t];if(typeof r=="object"&&r!==null&&("r"in r||"g"in r||"b"in r))return r}async function k1(e){const n=new Map;return await P1(n),await Z1(n,e),x.log("loadVariables: found",n.size,"variables"),n}async function P1(e){const n=await figma.variables.getLocalVariableCollectionsAsync(),t=[];for(const i of n)t.push(...i.variableIds);const r=await Promise.all(t.map(i=>figma.variables.getVariableByIdAsync(i))),o=await Promise.all(r.map(i=>i?$(i,!1):Promise.resolve(void 0)));for(let i=0;i<r.length;i++){const s=r[i],a=t[i];!s||a===void 0||e.set(a,{name:s.name,type:s.resolvedType,origin:"local",colorValue:W(s),path:o[i]})}}async function Z1(e,n){const t=R1(e,n);await Promise.all(Array.from(t).map(r=>A1(r,e)))}function R1(e,n){const t=new Set;if(n){for(const{id:i}of n.usages)e.has(i)||t.add(i);return t}const r=figma.currentPage.selection,o=n1(r);for(const i of o){const s=e1(i);for(const{id:a}of s)e.has(a)||t.add(a)}return t}async function A1(e,n){try{const t=await figma.variables.getVariableByIdAsync(e);if(!t)return;const r=await $(t,!0);if(n.set(e,{name:t.name,type:t.resolvedType,origin:"external",colorValue:W(t),path:r}),typeof figma.variables.importVariableByKeyAsync=="function"){const o=await figma.variables.importVariableByKeyAsync(t.key);if(o){const i=await $(o,!0);n.set(e,{name:o.name,type:o.resolvedType,origin:"external",colorValue:W(o),path:i})}}}catch(t){x.warn(`Failed to resolve variable ${e}:`,t)}}function Z(e){return Number(e.toFixed(2)).toString()}function O1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function B1(e,n){var i,s,a,l,C,d,f;if(!("effects"in e)||!Array.isArray(e.effects))return;const t=e.effects,r={};for(const c of t)r[c.type]=((i=r[c.type])!=null?i:0)+1;const o={};for(const c of t){const y=(s=r[c.type])!=null?s:0;o[c.type]=((a=o[c.type])!=null?a:0)+1;const b=o[c.type],v=Q(c.type),m=y>1?`${v} ${b}`:v,_=c.type.includes("BLUR")||c.type.includes("SHADOW"),H=(l=c.boundVariables)!=null?l:{},w=h(e);if(typeof c.radius=="number"){const u=H.radius;if(!(u!=null&&u.id)){const g=_?"Blur":"Radius";n.push({layer:w,layerId:e.id,property:`${m} ${g}`,value:Z(c.radius),effectGroup:m,subProp:g})}}if(c.type.includes("SHADOW")&&c.offset){const u=(C=H.offset)!=null?C:{};typeof c.offset.x=="number"&&!((d=u.x)!=null&&d.id)&&n.push({layer:w,layerId:e.id,property:`${m} Offset X`,value:Z(c.offset.x),effectGroup:m,subProp:"Offset X"}),typeof c.offset.y=="number"&&!((f=u.y)!=null&&f.id)&&n.push({layer:w,layerId:e.id,property:`${m} Offset Y`,value:Z(c.offset.y),effectGroup:m,subProp:"Offset Y"})}if(typeof c.spread=="number"){const u=H.spread;u!=null&&u.id||n.push({layer:w,layerId:e.id,property:`${m} Spread`,value:Z(c.spread),effectGroup:m,subProp:"Spread"})}if(c.color){const u=H.color;u!=null&&u.id||n.push({layer:w,layerId:e.id,property:`${m} Color`,value:O1(c.color),effectGroup:m,subProp:"Color"})}}}function I(e){return Number(e.toFixed(2)).toString()}function j(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function _1(e,n){var t,r,o,i;if("fills"in e&&Array.isArray(e.fills))for(const s of e.fills){const a=s;!((r=(t=a.boundVariables)==null?void 0:t.color)!=null&&r.id)&&a.color&&n.push({layer:h(e),layerId:e.id,property:p.FILL,value:j(a.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let s;for(const a of e.strokes){const l=a;if(!((i=(o=l.boundVariables)==null?void 0:o.color)!=null&&i.id)&&l.color){s=l.color;break}}s&&!M(e.id,p.STROKE)&&(n.push({layer:h(e),layerId:e.id,property:p.STROKE,value:j(s)}),e.strokes.length>1&&x.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function G1(e,n){var r,o;if(!("opacity"in e))return;const t=e.opacity;typeof t!="number"||t>=1||(o=(r=e.boundVariables)==null?void 0:r.opacity)!=null&&o.id||M(e.id,p.OPACITY)||n.push({layer:h(e),layerId:e.id,property:p.OPACITY,value:I(t)})}function F1(e,n){var s,a,l,C,d,f,c;if(!("strokeWeight"in e))return;const t=e;if(!("strokes"in e&&Array.isArray(t.strokes)&&((a=(s=t.strokes)==null?void 0:s.length)!=null?a:0)>0))return;const o=e.strokeWeight,i="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof o=="number"&&o!==0&&!((C=(l=e.boundVariables)==null?void 0:l.strokeWeight)!=null&&C.id)&&!i&&(M(e.id,p.STROKE_WEIGHT)||n.push({layer:h(e),layerId:e.id,property:p.STROKE_WEIGHT,value:I(o)}));for(const y of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(y in e))continue;const b=e[y];if(typeof b!="number"||b===0||(f=(d=e.boundVariables)==null?void 0:d[y])!=null&&f.id)continue;const v=(c=k[y])!=null?c:y;M(e.id,v)||n.push({layer:h(e),layerId:e.id,property:v,value:I(b)})}}function $1(e,n){var t,r,o,i,s;if("cornerRadius"in e){const a=e.cornerRadius,l="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof a=="number"&&a!==0&&!((r=(t=e.boundVariables)==null?void 0:t.cornerRadius)!=null&&r.id)&&!l&&(M(e.id,p.CORNER_RADIUS)||n.push({layer:h(e),layerId:e.id,property:p.CORNER_RADIUS,value:I(a)}))}for(const a of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(a in e))continue;const l=e[a];if(typeof l!="number"||l===0||(i=(o=e.boundVariables)==null?void 0:o[a])!=null&&i.id)continue;const C=(s=k[a])!=null?s:a;M(e.id,C)||n.push({layer:h(e),layerId:e.id,property:C,value:I(l)})}}function W1(e,n){var o,i;if(e.type!=="TEXT")return;const t=e,r=[{key:"fontSize",displayName:p.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:p.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:p.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:p.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:s,displayName:a,skipIfProcessed:l}of r){if(l&&s==="fontSize"&&O.has(t.id))continue;const C=t[s];typeof C!="number"||C===0||(i=(o=e.boundVariables)==null?void 0:o[s])!=null&&i.id||M(e.id,a)||n.push({layer:h(e),layerId:e.id,property:a,value:I(C)})}}function D1(e,n){var r,o;const t=[{key:"paddingLeft",displayName:p.PADDING_LEFT},{key:"paddingRight",displayName:p.PADDING_RIGHT},{key:"paddingTop",displayName:p.PADDING_TOP},{key:"paddingBottom",displayName:p.PADDING_BOTTOM},{key:"itemSpacing",displayName:p.ITEM_SPACING}];for(const{key:i,displayName:s}of t){if(!(i in e))continue;const a=e[i];typeof a!="number"||a===0||(o=(r=e.boundVariables)==null?void 0:r[i])!=null&&o.id||(x.log(`Found spacing property ${i} = ${a} on node ${e.name}`),M(e.id,s)||n.push({layer:h(e),layerId:e.id,property:s,value:I(a)}))}}function q1(e,n){var r,o;const t=[{key:"minWidth",displayName:p.MIN_WIDTH},{key:"maxWidth",displayName:p.MAX_WIDTH},{key:"minHeight",displayName:p.MIN_HEIGHT},{key:"maxHeight",displayName:p.MAX_HEIGHT}];for(const{key:i,displayName:s}of t){if(!(i in e))continue;const a=e[i];typeof a!="number"||a===0||(o=(r=e.boundVariables)==null?void 0:r[i])!=null&&o.id||M(e.id,s)||n.push({layer:h(e),layerId:e.id,property:s,value:I(a)})}}function z1(e,n){const t=e;G1(t,n),F1(t,n),$1(t,n),W1(t,n),D1(t,n),q1(t,n)}function U1(e){var n,t,r;if(e.type!=="INSTANCE")return null;try{const o=e;if(!o.mainComponent)return null;const i=o.mainComponent.id,s=((n=o.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?o.mainComponent.parent.id:"",a=JSON.stringify(Y((t=o.componentProperties)!=null?t:{})),l=JSON.stringify(Y((r=o.boundVariables)!=null?r:{}));return[i,s,a,l].join("|")}catch(o){return null}}function j1(e){var t,r;const n=new Map;for(const o of e){const i=(t=U1(o))!=null?t:`__node__${o.id}`,s=(r=n.get(i))!=null?r:[];s.push(o),n.set(i,s)}return n}function Y(e){const n=Object.keys(e).sort(),t={};for(const r of n)t[r]=e[r];return t}function Y1(e){const n=new Set;for(const t of e.values()){if(t.length<=1)continue;const r=t[0];if(!(!r||r.type!=="INSTANCE"))for(let o=1;o<t.length;o++){const i=t[o];i&&K1(i,n)}}return n}function K1(e,n){const t=[e];for(;t.length>0;){const r=t.pop();if(!r)continue;n.add(r.id);const o=r.children;Array.isArray(o)&&t.push(...o)}}function X1(e,n,t){const r=Object.values(e).flat(),o=r.length,i=n.length,s=o+i,a=s===0?0:o/s,l={local:0,external:0},C={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const d of r)l[d.origin]+=1,(d.type==="COLOR"||d.type==="FLOAT"||d.type==="STRING"||d.type==="BOOLEAN")&&(C[d.type]+=1);return{totalVariables:o,totalHardcoded:i,variableCoverage:a,byOrigin:l,byType:C,layerCount:Object.keys(e).length,scanDurationMs:t}}function J1(){return new Promise(e=>setTimeout(e,0))}function Q1(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function e7(e,n,t){const r=new Map,o=async(s,a,l)=>{if(r.has(s))return;const C=await figma.getNodeByIdAsync(s);if(C){const d=t.get(s),f={id:s,name:a,order:l,type:Q1(C)};d&&(f.count=d.count,f.mergedNodeIds=d.nodeIds),r.set(s,f)}};let i=0;for(const s of t.keys()){const a=await figma.getNodeByIdAsync(s);a&&await o(s,a.name,i++)}for(let s=0;s<e.length;s++){const a=e[s];a&&await o(a.layerId,a.layer,i+s)}for(let s=0;s<n.length;s++){const a=n[s];a&&await o(a.layerId,a.layer,i+e.length+s)}return r}function n7(e){var o,i,s;const n={},t=new Map,r=[...e].sort((a,l)=>{const C=a.layer.localeCompare(l.layer);return C!==0?C:a.property.localeCompare(l.property)});for(const a of r){const l=n[a.layerId];let C=t.get(a.layerId);(!l||!C)&&(n[a.layerId]=[],C=new Set,t.set(a.layerId,C));const d=`${a.property}_${(o=a.id)!=null?o:""}`,f=K.some(c=>a.property.includes(c));(!C.has(d)||f)&&(((s=n[i=a.layerId])!=null?s:n[i]=[]).push(a),C.add(d))}return n}let V=0;async function R(e){try{await t7((e==null?void 0:e.force)===!0)}catch(n){x.error("updateInspector error",n);const t={type:"error",message:String(n)};figma.ui.postMessage(t)}}async function t7(e){var w;V+=1;const n=V;d1(),T1();const t=Date.now();figma.ui.postMessage({type:"scan-start"});const r=figma.currentPage.selection,o=n1(r);if(!e&&o.length>U){const u={type:"too-large",nodeCount:o.length,limit:U};figma.ui.postMessage(u);return}const i=j1(o),s=Y1(i),a=[],l=[],C=new Map,d=[];let f=0;for(const[,u]of i){if(V!==n){x.log("Scan superseded — aborting");return}const g=u[0];if(!g||s.has(g.id))continue;u.length>1&&g.type==="INSTANCE"&&C.set(g.id,{count:u.length,nodeIds:u.map(P=>P.id)});const S=e1(g);for(const P of S){d.push(P);const{layer:t1,property:r1,id:D,effectGroup:q,subProp:z}=P,G={layer:t1,layerId:g.id,property:r1,name:D,type:"STRING",origin:"external",id:D};q!==void 0&&(G.effectGroup=q),z!==void 0&&(G.subProp=z),a.push(G)}_1(g,l),z1(g,l),B1(g,l),f+=1,f%a1===0&&await J1()}const c=await k1({usages:d});if(V!==n)return;for(let u=0;u<a.length;u++){const g=a[u];if(!g)continue;const L=c.get(g.id);if(!L)continue;const S={layer:g.layer,layerId:g.layerId,property:g.property,name:L.name,type:L.type,origin:L.origin,id:g.id};L.colorValue!==void 0&&(S.colorValue=L.colorValue),L.path!==void 0&&(S.path=L.path),g.effectGroup!==void 0&&(S.effectGroup=g.effectGroup),g.subProp!==void 0&&(S.subProp=g.subProp),a[u]=S}const y=await e7(a,l,C);if(V!==n)return;const b=n7(a),v={};for(const u of o){if(u.type!=="INSTANCE")continue;const g=h(u),L=(w=v[g])!=null?w:[];L.push(u.id),v[g]=L}const m=Date.now()-t,_=X1(b,l,m);x.log(`Scan ${n} done: ${a.length} usages, ${l.length} unbound, ${m}ms`);const H={type:"render",byLayer:b,unbound:l,layerInfoMap:Object.fromEntries(y),instancesByName:v,noVariablesFound:a.length===0&&l.length===0,stats:_,scanDurationMs:m};figma.ui.postMessage(H)}function r7(){figma.showUI(o1.replace("</head>",`<style>${i1}</style></head>`),{width:300,height:400,title:"Variable Inspector",themeColors:!0}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const t=await figma.getNodeByIdAsync(n.nodeId);t&&(figma.currentPage.selection=[t],figma.viewport.scrollAndZoomIntoView([t]))}else n.type==="rescan"?R():n.type==="force-scan"&&R({force:!0})};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{R()},C1)}),R()}r7();
+}
+
+/* ==========================================================================
+   Live scan progress strip (rendered by ensureScanProgressBar). Sits at the
+   top of #app and updates from partial-render messages.
+   ========================================================================== */
+
+.vi-scan-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: var(--fg-bg-soft);
+  border-radius: var(--fg-radius);
+  border: 1px solid var(--fg-border);
+  font-size: 10px;
+  color: var(--fg-text-secondary);
+}
+
+.vi-scan-progress-bar {
+  position: relative;
+  height: 4px;
+  background: var(--fg-stats-bar);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.vi-scan-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--fg-accent), #19a3d2);
+  border-radius: 999px;
+  transition: width 0.18s ease;
+}
+
+.vi-scan-progress-meta {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ==========================================================================
+   Overview (Aperçu) tab — coverage donut + per-property cards + top
+   hardcoded values. Density adapts via .overview[data-density].
+   ========================================================================== */
+
+:root {
+  --overview-donut-track: #e6e6e6;
+  --overview-donut-arc: var(--fg-accent);
+  --overview-card-bar-bg: #ffdcdc;
+  --overview-card-bar-fill: #1969d2;
+  --overview-card-bound: #1969d2;
+  --overview-card-unbound: #b12020;
+  --overview-success: #2ea043;
+}
+
+html.figma-dark {
+  --overview-donut-track: #444444;
+  --overview-donut-arc: var(--fg-accent);
+  --overview-card-bar-bg: #4a1f1f;
+  --overview-card-bar-fill: #64b6ff;
+  --overview-card-bound: #64b6ff;
+  --overview-card-unbound: #ff8c8c;
+  --overview-success: #4ee07a;
+}
+
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--fg-stats-bg);
+  border: 1px solid var(--fg-stats-border);
+  border-radius: var(--fg-radius);
+}
+
+.overview-donut {
+  flex: none;
+}
+
+.overview-counters {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.overview-counter-main {
+  font-size: 12px;
+  color: var(--fg-text);
+}
+
+.overview-counter-main strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-counter-sub {
+  font-size: 10px;
+  color: var(--fg-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-section-title {
+  margin: 0 0 6px 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-text-tertiary);
+}
+
+/* --- Distribution row (origine + types) --- */
+
+.overview-distrib {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--fg-bg);
+  border: 1px solid var(--fg-border);
+  border-radius: var(--fg-radius);
+}
+
+.overview-distrib-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.overview-distrib-label {
+  flex: none;
+  width: 56px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fg-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.overview-distrib-bar {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  background: var(--fg-external-bg);
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.overview-distrib-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--fg-local-fg);
+  border-radius: 999px;
+}
+
+.overview-distrib-meta {
+  flex: none;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-text-secondary);
+  white-space: nowrap;
+}
+
+.overview-origin-local { color: var(--fg-local-fg); font-weight: 500; }
+.overview-origin-external { color: var(--fg-external-fg); font-weight: 500; }
+
+.overview-types-list {
+  flex: 1;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.overview-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--fg-bg-soft);
+  font-size: 10px;
+  color: var(--fg-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-type-chip strong {
+  color: var(--fg-text);
+  font-weight: 600;
+}
+
+/* --- Health bar (3-segment + legend) --- */
+
+.overview-health {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-health-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--fg-stats-bar);
+}
+
+.overview-health-seg {
+  display: block;
+  height: 100%;
+  transition: width 0.18s ease;
+}
+
+.overview-health-bound { background: var(--overview-success); }
+.overview-health-partial { background: #d0a040; }
+.overview-health-unbound { background: var(--overview-card-unbound); }
+
+html.figma-dark .overview-health-partial { background: #d0a040; }
+
+.overview-health-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--fg-text-secondary);
+}
+
+.overview-health-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overview-health-legend-item::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.overview-health-legend-item.overview-health-bound::before { background: var(--overview-success); }
+.overview-health-legend-item.overview-health-partial::before { background: #d0a040; }
+.overview-health-legend-item.overview-health-unbound::before { background: var(--overview-card-unbound); }
+
+.overview-health-legend-item strong {
+  color: var(--fg-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Best/Worst extremes --- */
+
+.overview-extremes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.overview-extreme-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: var(--fg-bg);
+  border: 1px solid var(--fg-border);
+  border-radius: var(--fg-radius);
+}
+
+.overview-extreme-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.overview-extreme-best .overview-extreme-icon { background: var(--overview-success); }
+.overview-extreme-worst .overview-extreme-icon { background: var(--overview-card-unbound); }
+
+.overview-extreme-label {
+  flex: none;
+  color: var(--fg-text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.overview-extreme-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--fg-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.overview-extreme-score {
+  flex: none;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-text-secondary);
+}
+
+.overview-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.overview-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--fg-bg);
+  border: 1px solid var(--fg-border);
+  border-radius: var(--fg-radius);
+}
+
+.overview-top-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.overview-top-property {
+  flex: none;
+  color: var(--fg-text-secondary);
+}
+
+.overview-top-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--fg-text);
+  min-width: 0;
+}
+
+.overview-top-count {
+  flex: none;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-text-tertiary);
+  padding: 1px 6px;
+  background: var(--fg-bg-soft);
+  border-radius: 999px;
+}
+
+.overview-top-action {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid var(--fg-border);
+  border-radius: var(--fg-radius);
+  background: var(--fg-bg);
+  cursor: pointer;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--fg-text);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.overview-top-action:hover {
+  background: var(--fg-accent);
+  border-color: var(--fg-accent);
+  color: #fff;
+}
+
+.overview-empty-hint {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--fg-text-secondary);
+  text-align: center;
+  background: var(--fg-bg-soft);
+  border-radius: var(--fg-radius);
+}
+
+.overview-empty-success {
+  color: var(--overview-success);
+}
+
+/* Compact density: tighten the header strip + hide spacing between sections. */
+.overview[data-density="compact"] {
+  gap: 8px;
+}
+
+.overview[data-density="compact"] .overview-header {
+  padding: 8px 10px;
+  gap: 10px;
+}`,d={FILL:"Fill",STROKE:"Stroke",STROKE_COLOR:"Stroke Color",OPACITY:"Opacity",STROKE_WEIGHT:"Stroke Weight",CORNER_RADIUS:"Corner Radius",FONT_SIZE:"Font Size",FONT_WEIGHT:"Font Weight",FONT_FAMILY:"Font Family",LETTER_SPACING:"Letter Spacing",LINE_HEIGHT:"Line Height",PARAGRAPH_SPACING:"Paragraph Spacing",PADDING_LEFT:"Padding Left",PADDING_RIGHT:"Padding Right",PADDING_TOP:"Padding Top",PADDING_BOTTOM:"Padding Bottom",ITEM_SPACING:"Gap",MIN_WIDTH:"Min Width",MAX_WIDTH:"Max Width",MIN_HEIGHT:"Min Height",MAX_HEIGHT:"Max Height",GRID_COLOR:"Grid Color",VISIBLE:"Visible",TEXT_DECORATION:"Text Decoration",TEXT_CASE:"Text Case"},A={itemSpacing:"Gap",paddingTop:"Padding Top",paddingRight:"Padding Right",paddingBottom:"Padding Bottom",paddingLeft:"Padding Left",cornerRadius:"Corner Radius",strokeWeight:"Stroke Weight",opacity:"Opacity",fontSize:"Font Size",fontWeight:"Font Weight",fontName:"Font Family",letterSpacing:"Letter Spacing",lineHeight:"Line Height",paragraphSpacing:"Paragraph Spacing",paragraphIndent:"Paragraph Indent",textCase:"Text Case",textDecoration:"Text Decoration",textAlignHorizontal:"Text Align Horizontal",textAlignVertical:"Text Align Vertical",topLeftRadius:"Top Left Radius",topRightRadius:"Top Right Radius",bottomLeftRadius:"Bottom Left Radius",bottomRightRadius:"Bottom Right Radius",strokeTopWeight:"Stroke Top Weight",strokeBottomWeight:"Stroke Bottom Weight",strokeLeftWeight:"Stroke Left Weight",strokeRightWeight:"Stroke Right Weight",width:"Width",height:"Height",minWidth:"Min Width",maxWidth:"Max Width",minHeight:"Min Height",maxHeight:"Max Height",visible:"Visible"},Q=["Padding Left","Padding Right","Padding Top","Padding Bottom","Gap"],c1=200,K=8e3,p1=10,d1=20,C1=250;function u1(){try{return typeof process!="undefined"&&!0}catch(e){return!1}}const z=u1(),L={log:(...e)=>{z||console.log(...e)},warn:(...e)=>{z||console.warn(...e)},error:(...e)=>{z||console.error(...e)}},_=new Set,P=new Set;function f1(e,n,r){return`${e}|${n}`}function g1(){_.clear(),P.clear()}function M(e,n,r){const t=f1(e,n);return L.log(`Checking property: ${t}, propertyName: ${n}, exists: ${P.has(t)}`),Q.some(a=>n.includes(a))?(L.log(`Skipping deduplication for spacing property: ${n}`),P.add(t),!1):P.has(t)?!0:(P.add(t),!1)}const N=/^I?\d+:\d+(;\d+:\d+)*$/,h1=/^I(\d+:\d+)/;function e1(e){var r;const n=e.mainComponent;return n?((r=n.parent)==null?void 0:r.type)==="COMPONENT_SET"&&!N.test(n.parent.name)?n.parent.name:N.test(n.name)?null:n.name:null}function n1(e,n){var o;let r=e,t=0;for(;r&&t<n;){const a=r.name;if(typeof a=="string"&&!N.test(a)&&r.type!=="PAGE"&&r.type!=="DOCUMENT")return a;r=(o=r.parent)!=null?o:null,t++}return null}function m1(e){const n=h1.exec(e);if(!n)return null;const r=n[1];if(!r)return null;const t=figma.getNodeById(r);if(!t)return null;if(!N.test(t.name))return t.name;if(t.type==="INSTANCE"){const o=e1(t);if(o)return o}return n1(t.parent,5)}function f(e){if(!N.test(e.name))return e.name;if(e.type==="INSTANCE"){const t=e1(e);if(t)return t}if(e.type==="COMPONENT"){const t=e.parent;if((t==null?void 0:t.type)==="COMPONENT_SET"&&!N.test(t.name))return t.name}const n=n1(e.parent,10);if(n)return n;const r=m1(e.name);return r||e.type.charAt(0).toUpperCase()+e.type.slice(1).toLowerCase().replace(/_/g," ")}const b1=[{key:"minWidth",name:d.MIN_WIDTH},{key:"maxWidth",name:d.MAX_WIDTH},{key:"minHeight",name:d.MIN_HEIGHT},{key:"maxHeight",name:d.MAX_HEIGHT}];function y1(e,n){var t;const r=e.boundVariables;if(r)for(const{key:o,name:a}of b1){const i=(t=r[o])==null?void 0:t.id;i&&n.push({layer:f(e),property:a,id:i})}}function v1(e,n){var t,o;const r=e.layoutGrids;if(Array.isArray(r))for(const a of r){const i=(o=(t=a.boundVariables)==null?void 0:t.color)==null?void 0:o.id;i&&n.push({layer:f(e),property:d.GRID_COLOR,id:i})}}function w1(e,n){var t,o;const r=(o=(t=e.boundVariables)==null?void 0:t.visible)==null?void 0:o.id;r&&n.push({layer:f(e),property:d.VISIBLE,id:r})}function x1(e,n){var a,i;if(e.type!=="TEXT")return;const r=e.boundVariables;if(!r)return;const t=(a=r.textDecoration)==null?void 0:a.id,o=(i=r.textCase)==null?void 0:i.id;t&&n.push({layer:f(e),property:d.TEXT_DECORATION,id:t}),o&&n.push({layer:f(e),property:d.TEXT_CASE,id:o})}function L1(e,n){var t;if(e.type!=="INSTANCE")return;const r=(t=e.boundVariables)==null?void 0:t.componentProperties;if(r)for(const[o,a]of Object.entries(r))a!=null&&a.id&&n.push({layer:f(e),property:`Component / ${o}`,id:a.id})}function M1(e,n){var i;const r=[];"fills"in e&&Array.isArray(e.fills)&&r.push(...e.fills);const t=e;Array.isArray(t.backgrounds)&&r.push(...t.backgrounds);const o=new Set,a=new Set;for(const s of r){const c=(i=s.boundVariables)==null?void 0:i.color;c!=null&&c.id&&!o.has(c.id)&&(a.add(c.id),o.add(c.id))}if(a.size>0){const s=Array.from(a)[0];s&&n.push({layer:f(e),property:d.FILL,id:s}),a.size>1&&L.log(`${e.name} has ${a.size} fill variables, only the first is shown`)}}function I1(e,n){var r;if(!(!("strokes"in e)||!Array.isArray(e.strokes)))for(const t of e.strokes){const a=(r=t.boundVariables)==null?void 0:r.color;a!=null&&a.id&&n.push({layer:f(e),property:d.STROKE_COLOR,id:a.id})}}function t1(e){return e.toLowerCase().replace(/_/g," ").replace(/\b\w/g,n=>n.toUpperCase())}function S1(e,n){return e==="radius"?n.includes("BLUR")||n.includes("SHADOW")?"Blur":"Radius":e==="color"?"Color":e==="spread"?"Spread":e==="offset"?"Offset":e.charAt(0).toUpperCase()+e.slice(1)}function E1(e,n){var a,i,s;if(!("effects"in e)||!Array.isArray(e.effects))return;const r=e.effects,t={};for(const l of r)t[l.type]=((a=t[l.type])!=null?a:0)+1;const o={};for(const l of r){if(!l.boundVariables)continue;const c=(i=t[l.type])!=null?i:0;o[l.type]=((s=o[l.type])!=null?s:0)+1;const C=o[l.type],u=t1(l.type),p=c>1?`${u} ${C}`:u;for(const[g,v]of Object.entries(l.boundVariables)){const w=G(v);if(w){const m=S1(g,l.type);n.push({layer:f(e),property:`${p} ${g}`,id:w,effectGroup:p,subProp:m})}}}}function H1(e,n){var s,l;const t=e.boundVariables;if(!t)return;const o=new Set(["color","fills","fills.0"]);for(const[c,C]of Object.entries(t)){if(o.has(c)||c.startsWith("fills."))continue;const u=G(C);if(u){const p=(s=A[c])!=null?s:c;n.push({layer:f(e),property:p,id:u})}}const a=["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius","strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"],i=e;for(const c of a){const C=t[c],u=G(C);if(i[c]!==void 0&&u){const p=(l=A[c])!=null?l:c;n.push({layer:f(e),property:p,id:u})}}}function G(e){if(e===null||typeof e!="object")return;const n=e.id;return typeof n=="string"?n:void 0}function k1(e,n){var a;const r=e.boundVariables;if(!r)return;const t={fontSize:d.FONT_SIZE,fontWeight:d.FONT_WEIGHT,fontFamily:d.FONT_FAMILY,letterSpacing:d.LETTER_SPACING,lineHeight:d.LINE_HEIGHT,paragraphSpacing:d.PARAGRAPH_SPACING};for(const[i,s]of Object.entries(t)){const l=G(r[i]);l&&(n.push({layer:f(e),property:s,id:l}),i==="fontSize"&&_.add(e.id))}const o={};N1(r,o);for(const[i,s]of Object.entries(o)){let l=i;for(const[c,C]of Object.entries(t))if(i.includes(c)){l=C,c==="fontSize"&&_.add(e.id);break}l===i&&(l=(a=A[i])!=null?a:i);for(const c of s)n.push({layer:f(e),property:l,id:c})}}function N1(e,n){var o;if(!e||typeof e!="object")return;const r=[{value:e,path:[]}],t=new WeakSet;for(;r.length>0;){const a=r.pop();if(!a)continue;const{value:i,path:s}=a;if(i===null||typeof i!="object"||s.length>d1||t.has(i))continue;t.add(i);const l=i.id;if(typeof l=="string"){const c=s.join(".");if(!c.startsWith("fills.")&&c!=="fills"){const C=(o=n[c])!=null?o:[];C.push(l),n[c]=C}continue}for(const c of Object.keys(i))c==="fills"||s.length>0&&s[0]==="fills"||r.push({value:i[c],path:[...s,c]})}}function r1(e){const n=[];return M1(e,n),I1(e,n),E1(e,n),y1(e,n),v1(e,n),w1(e,n),e.type==="TEXT"&&(k1(e,n),x1(e,n)),e.type==="INSTANCE"&&L1(e,n),H1(e,n),n}function o1(e){const n=[],r=[...e];for(;r.length>0;){const t=r.pop();t&&(n.push(t),"children"in t&&Array.isArray(t.children)&&r.push(...t.children))}return n}let $=null,Z=null;async function D(e,n){var c,C;const r=[];let t=e;for(let u=0;u<p1;u++){r.push(t.name);const p=Object.keys((c=t.valuesByMode)!=null?c:{});if(p.length===0)break;const g=p[0];if(g===void 0)break;const v=t.valuesByMode[g];if(typeof v=="object"&&v!==null&&v.type==="VARIABLE_ALIAS"){const w=v.id,m=await figma.variables.getVariableByIdAsync(w);if(!m||m.id===t.id)break;t=m;continue}break}const o=r.length>1,a=await T1(t.variableCollectionId),i=t.name.split("/").filter(u=>u.length>0),s=(C=i.pop())!=null?C:t.name,l={collection:a,groups:i,name:s,isAlias:o};return n&&(l.library=P1(t)),o&&(l.aliasChain=r),l}async function T1(e){var r;return(r=(await V1()).get(e))!=null?r:"Unknown collection"}async function V1(){return $||Z||(Z=(async()=>{const e=await figma.variables.getLocalVariableCollectionsAsync(),n=new Map;for(const r of e)n.set(r.id,r.name);return $=n,n})(),Z)}function P1(e){var n;return(n=e.libraryName)!=null?n:"External Library"}function Z1(){$=null,Z=null}function W(e){if(e.resolvedType!=="COLOR")return;const n=Object.keys(e.valuesByMode);if(n.length===0)return;const r=n[0];if(r===void 0)return;const t=e.valuesByMode[r];if(typeof t=="object"&&t!==null&&("r"in t||"g"in t||"b"in t))return t}async function A1(e){const n=new Map;return await R1(n),await O1(n,e),L.log("loadVariables: found",n.size,"variables"),n}async function R1(e){const n=await figma.variables.getLocalVariableCollectionsAsync(),r=[];for(const a of n)r.push(...a.variableIds);const t=await Promise.all(r.map(a=>figma.variables.getVariableByIdAsync(a))),o=await Promise.all(t.map(a=>a?D(a,!1):Promise.resolve(void 0)));for(let a=0;a<t.length;a++){const i=t[a],s=r[a];!i||s===void 0||e.set(s,{name:i.name,type:i.resolvedType,origin:"local",colorValue:W(i),path:o[a]})}}async function O1(e,n){const r=B1(e,n);await Promise.all(Array.from(r).map(t=>$1(t,e)))}function B1(e,n){const r=new Set;if(n){for(const{id:a}of n.usages)e.has(a)||r.add(a);return r}const t=figma.currentPage.selection,o=o1(t);for(const a of o){const i=r1(a);for(const{id:s}of i)e.has(s)||r.add(s)}return r}async function $1(e,n){try{const r=await figma.variables.getVariableByIdAsync(e);if(!r)return;const t=await D(r,!0);if(n.set(e,{name:r.name,type:r.resolvedType,origin:"external",colorValue:W(r),path:t}),typeof figma.variables.importVariableByKeyAsync=="function"){const o=await figma.variables.importVariableByKeyAsync(r.key);if(o){const a=await D(o,!0);n.set(e,{name:o.name,type:o.resolvedType,origin:"external",colorValue:W(o),path:a})}}}catch(r){L.warn(`Failed to resolve variable ${e}:`,r)}}function O(e){return Number(e.toFixed(2)).toString()}function _1(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function G1(e,n){var a,i,s,l,c,C,u;if(!("effects"in e)||!Array.isArray(e.effects))return;const r=e.effects,t={};for(const p of r)t[p.type]=((a=t[p.type])!=null?a:0)+1;const o={};for(const p of r){const g=(i=t[p.type])!=null?i:0;o[p.type]=((s=o[p.type])!=null?s:0)+1;const v=o[p.type],w=t1(p.type),m=g>1?`${w} ${v}`:w,T=p.type.includes("BLUR")||p.type.includes("SHADOW"),I=(l=p.boundVariables)!=null?l:{},S=f(e);if(typeof p.radius=="number"){const y=I.radius;if(!(y!=null&&y.id)){const R=T?"Blur":"Radius";n.push({layer:S,layerId:e.id,property:`${m} ${R}`,value:O(p.radius),effectGroup:m,subProp:R})}}if(p.type.includes("SHADOW")&&p.offset){const y=(c=I.offset)!=null?c:{};typeof p.offset.x=="number"&&!((C=y.x)!=null&&C.id)&&n.push({layer:S,layerId:e.id,property:`${m} Offset X`,value:O(p.offset.x),effectGroup:m,subProp:"Offset X"}),typeof p.offset.y=="number"&&!((u=y.y)!=null&&u.id)&&n.push({layer:S,layerId:e.id,property:`${m} Offset Y`,value:O(p.offset.y),effectGroup:m,subProp:"Offset Y"})}if(typeof p.spread=="number"){const y=I.spread;y!=null&&y.id||n.push({layer:S,layerId:e.id,property:`${m} Spread`,value:O(p.spread),effectGroup:m,subProp:"Spread"})}if(p.color){const y=I.color;y!=null&&y.id||n.push({layer:S,layerId:e.id,property:`${m} Color`,value:_1(p.color),effectGroup:m,subProp:"Color"})}}}function E(e){return Number(e.toFixed(2)).toString()}function X(e){return`rgb(${Math.round(e.r*255)}, ${Math.round(e.g*255)}, ${Math.round(e.b*255)})`}function F1(e,n){var r,t,o,a;if("fills"in e&&Array.isArray(e.fills))for(const i of e.fills){const s=i;!((t=(r=s.boundVariables)==null?void 0:r.color)!=null&&t.id)&&s.color&&n.push({layer:f(e),layerId:e.id,property:d.FILL,value:X(s.color)})}if("strokes"in e&&Array.isArray(e.strokes)){let i;for(const s of e.strokes){const l=s;if(!((a=(o=l.boundVariables)==null?void 0:o.color)!=null&&a.id)&&l.color){i=l.color;break}}i&&!M(e.id,d.STROKE)&&(n.push({layer:f(e),layerId:e.id,property:d.STROKE,value:X(i)}),e.strokes.length>1&&L.log(`${e.name} has ${e.strokes.length} strokes, only the first unbound one is shown`))}}function z1(e,n){var t,o;if(!("opacity"in e))return;const r=e.opacity;typeof r!="number"||r>=1||(o=(t=e.boundVariables)==null?void 0:t.opacity)!=null&&o.id||M(e.id,d.OPACITY)||n.push({layer:f(e),layerId:e.id,property:d.OPACITY,value:E(r)})}function D1(e,n){var i,s,l,c,C,u,p;if(!("strokeWeight"in e))return;const r=e;if(!("strokes"in e&&Array.isArray(r.strokes)&&((s=(i=r.strokes)==null?void 0:i.length)!=null?s:0)>0))return;const o=e.strokeWeight,a="strokeTopWeight"in e||"strokeBottomWeight"in e||"strokeLeftWeight"in e||"strokeRightWeight"in e;typeof o=="number"&&o!==0&&!((c=(l=e.boundVariables)==null?void 0:l.strokeWeight)!=null&&c.id)&&!a&&(M(e.id,d.STROKE_WEIGHT)||n.push({layer:f(e),layerId:e.id,property:d.STROKE_WEIGHT,value:E(o)}));for(const g of["strokeTopWeight","strokeBottomWeight","strokeLeftWeight","strokeRightWeight"]){if(!(g in e))continue;const v=e[g];if(typeof v!="number"||v===0||(u=(C=e.boundVariables)==null?void 0:C[g])!=null&&u.id)continue;const w=(p=A[g])!=null?p:g;M(e.id,w)||n.push({layer:f(e),layerId:e.id,property:w,value:E(v)})}}function W1(e,n){var r,t,o,a,i;if("cornerRadius"in e){const s=e.cornerRadius,l="topLeftRadius"in e||"topRightRadius"in e||"bottomLeftRadius"in e||"bottomRightRadius"in e;typeof s=="number"&&s!==0&&!((t=(r=e.boundVariables)==null?void 0:r.cornerRadius)!=null&&t.id)&&!l&&(M(e.id,d.CORNER_RADIUS)||n.push({layer:f(e),layerId:e.id,property:d.CORNER_RADIUS,value:E(s)}))}for(const s of["topLeftRadius","topRightRadius","bottomLeftRadius","bottomRightRadius"]){if(!(s in e))continue;const l=e[s];if(typeof l!="number"||l===0||(a=(o=e.boundVariables)==null?void 0:o[s])!=null&&a.id)continue;const c=(i=A[s])!=null?i:s;M(e.id,c)||n.push({layer:f(e),layerId:e.id,property:c,value:E(l)})}}function U1(e,n){var o,a;if(e.type!=="TEXT")return;const r=e,t=[{key:"fontSize",displayName:d.FONT_SIZE,skipIfProcessed:!0},{key:"letterSpacing",displayName:d.LETTER_SPACING,skipIfProcessed:!1},{key:"lineHeight",displayName:d.LINE_HEIGHT,skipIfProcessed:!1},{key:"paragraphSpacing",displayName:d.PARAGRAPH_SPACING,skipIfProcessed:!1}];for(const{key:i,displayName:s,skipIfProcessed:l}of t){if(l&&i==="fontSize"&&_.has(r.id))continue;const c=r[i];typeof c!="number"||c===0||(a=(o=e.boundVariables)==null?void 0:o[i])!=null&&a.id||M(e.id,s)||n.push({layer:f(e),layerId:e.id,property:s,value:E(c)})}}function q1(e,n){var t,o;const r=[{key:"paddingLeft",displayName:d.PADDING_LEFT},{key:"paddingRight",displayName:d.PADDING_RIGHT},{key:"paddingTop",displayName:d.PADDING_TOP},{key:"paddingBottom",displayName:d.PADDING_BOTTOM},{key:"itemSpacing",displayName:d.ITEM_SPACING}];for(const{key:a,displayName:i}of r){if(!(a in e))continue;const s=e[a];typeof s!="number"||s===0||(o=(t=e.boundVariables)==null?void 0:t[a])!=null&&o.id||(L.log(`Found spacing property ${a} = ${s} on node ${e.name}`),M(e.id,i)||n.push({layer:f(e),layerId:e.id,property:i,value:E(s)}))}}function j1(e,n){var t,o;const r=[{key:"minWidth",displayName:d.MIN_WIDTH},{key:"maxWidth",displayName:d.MAX_WIDTH},{key:"minHeight",displayName:d.MIN_HEIGHT},{key:"maxHeight",displayName:d.MAX_HEIGHT}];for(const{key:a,displayName:i}of r){if(!(a in e))continue;const s=e[a];typeof s!="number"||s===0||(o=(t=e.boundVariables)==null?void 0:t[a])!=null&&o.id||M(e.id,i)||n.push({layer:f(e),layerId:e.id,property:i,value:E(s)})}}function Y1(e,n){const r=e;z1(r,n),D1(r,n),W1(r,n),U1(r,n),q1(r,n),j1(r,n)}function K1(e){var n,r,t;if(e.type!=="INSTANCE")return null;try{const o=e;if(!o.mainComponent)return null;const a=o.mainComponent.id,i=((n=o.mainComponent.parent)==null?void 0:n.type)==="COMPONENT_SET"?o.mainComponent.parent.id:"",s=JSON.stringify(J((r=o.componentProperties)!=null?r:{})),l=JSON.stringify(J((t=o.boundVariables)!=null?t:{}));return[a,i,s,l].join("|")}catch(o){return null}}function X1(e){var r,t;const n=new Map;for(const o of e){const a=(r=K1(o))!=null?r:`__node__${o.id}`,i=(t=n.get(a))!=null?t:[];i.push(o),n.set(a,i)}return n}function J(e){const n=Object.keys(e).sort(),r={};for(const t of n)r[t]=e[t];return r}function J1(e){const n=new Set;for(const r of e.values()){if(r.length<=1)continue;const t=r[0];if(!(!t||t.type!=="INSTANCE"))for(let o=1;o<r.length;o++){const a=r[o];a&&Q1(a,n)}}return n}function Q1(e,n){const r=[e];for(;r.length>0;){const t=r.pop();if(!t)continue;n.add(t.id);const o=t.children;Array.isArray(o)&&r.push(...o)}}const ee=10;function ne(e,n,r,t={}){var u,p;const o=Object.values(e).flat(),a=o.length,i=n.length,s=a+i,l=s===0?0:a/s,c={local:0,external:0},C={COLOR:0,FLOAT:0,STRING:0,BOOLEAN:0};for(const g of o)c[g.origin]+=1,(g.type==="COLOR"||g.type==="FLOAT"||g.type==="STRING"||g.type==="BOOLEAN")&&(C[g.type]+=1);return{totalVariables:a,totalHardcoded:i,variableCoverage:l,byOrigin:c,byType:C,layerCount:Object.keys(e).length,scanDurationMs:r,byProperty:te(o,n),topHardcoded:re(n,(u=t.topHardcodedLimit)!=null?u:ee),instanceMergedCount:(p=t.instanceMergedCount)!=null?p:0}}function te(e,n){const r=new Map,t=o=>{let a=r.get(o);return a||(a={property:o,bound:0,unbound:0,byOrigin:{local:0,external:0}},r.set(o,a)),a};for(const o of e){const a=t(o.property);a.bound+=1,(o.origin==="local"||o.origin==="external")&&(a.byOrigin[o.origin]+=1)}for(const o of n)t(o.property).unbound+=1;return Array.from(r.values()).sort((o,a)=>{const i=a.bound+a.unbound-(o.bound+o.unbound);return i!==0?i:o.property.localeCompare(a.property)})}function re(e,n){if(n<=0)return[];const r=new Map;for(const t of e){const o=`${t.property}\0${t.value}`;let a=r.get(o);a||(a={property:t.property,value:t.value,count:0,nodeIds:[],_ids:new Set},r.set(o,a)),a._ids.has(t.layerId)||(a._ids.add(t.layerId),a.nodeIds.push(t.layerId)),a.count+=1}return Array.from(r.values()).filter(t=>t.count>=2).sort((t,o)=>o.count!==t.count?o.count-t.count:t.property.localeCompare(o.property)).slice(0,n).map(({property:t,value:o,count:a,nodeIds:i})=>({property:t,value:o,count:a,nodeIds:i}))}function oe(){return new Promise(e=>setTimeout(e,0))}function ae(e){if(e.type==="COMPONENT"||e.type==="INSTANCE")return e.type;if("layoutMode"in e){const n=e;return n.layoutWrap==="WRAP"?"AUTO_WRAP":n.layoutMode==="HORIZONTAL"?"AUTO_HORIZONTAL":n.layoutMode==="VERTICAL"?"AUTO_VERTICAL":e.type}return e.type}async function ie(e,n,r){const t=new Map,o=async(i,s,l)=>{if(t.has(i))return;const c=await figma.getNodeByIdAsync(i);if(c){const C=r.get(i),u={id:i,name:s,order:l,type:ae(c)};C&&(u.count=C.count,u.mergedNodeIds=C.nodeIds),t.set(i,u)}};let a=0;for(const i of r.keys()){const s=await figma.getNodeByIdAsync(i);s&&await o(i,s.name,a++)}for(let i=0;i<e.length;i++){const s=e[i];s&&await o(s.layerId,s.layer,a+i)}for(let i=0;i<n.length;i++){const s=n[i];s&&await o(s.layerId,s.layer,a+e.length+i)}return t}function se(e){var o,a,i;const n={},r=new Map,t=[...e].sort((s,l)=>{const c=s.layer.localeCompare(l.layer);return c!==0?c:s.property.localeCompare(l.property)});for(const s of t){const l=n[s.layerId];let c=r.get(s.layerId);(!l||!c)&&(n[s.layerId]=[],c=new Set,r.set(s.layerId,c));const C=`${s.property}_${(o=s.id)!=null?o:""}`,u=Q.some(p=>s.property.includes(p));(!c.has(C)||u)&&(((i=n[a=s.layerId])!=null?i:n[a]=[]).push(s),c.add(C))}return n}let V=0;async function B(e){try{await le((e==null?void 0:e.force)===!0)}catch(n){L.error("updateInspector error",n);const r={type:"error",message:String(n)};figma.ui.postMessage(r)}}async function le(e){var U;V+=1;const n=V;g1(),Z1();const r=Date.now();figma.ui.postMessage({type:"scan-start"});const t=figma.currentPage.selection,o=o1(t);if(!e&&o.length>K){const b={type:"too-large",nodeCount:o.length,limit:K};figma.ui.postMessage(b);return}const a=X1(o),i=J1(a),s=[],l=[],c=new Map,C=[],u=a.size,p=new Set;let g=0;for(const[,b]of a){if(V!==n){L.log("Scan superseded — aborting");return}const h=b[0];if(!h||i.has(h.id))continue;b.length>1&&h.type==="INSTANCE"&&c.set(h.id,{count:b.length,nodeIds:b.map(k=>k.id)});const H=r1(h);for(const k of H){C.push(k);const{layer:a1,property:i1,id:q,effectGroup:j,subProp:Y}=k,F={layer:a1,layerId:h.id,property:i1,name:q,type:"STRING",origin:"external",id:q};j!==void 0&&(F.effectGroup=j),Y!==void 0&&(F.subProp=Y),s.push(F),p.add(h.id)}if(F1(h,l),Y1(h,l),G1(h,l),g+=1,g%c1===0){const k={type:"partial-render",progress:u===0?1:g/u,statsPreview:{totalVariables:s.length,totalHardcoded:l.length,layerCount:p.size}};figma.ui.postMessage(k),await oe()}}const v=await A1({usages:C});if(V!==n)return;for(let b=0;b<s.length;b++){const h=s[b];if(!h)continue;const x=v.get(h.id);if(!x)continue;const H={layer:h.layer,layerId:h.layerId,property:h.property,name:x.name,type:x.type,origin:x.origin,id:h.id};x.colorValue!==void 0&&(H.colorValue=x.colorValue),x.path!==void 0&&(H.path=x.path),h.effectGroup!==void 0&&(H.effectGroup=h.effectGroup),h.subProp!==void 0&&(H.subProp=h.subProp),s[b]=H}const w=await ie(s,l,c);if(V!==n)return;const m=se(s),T={};for(const b of o){if(b.type!=="INSTANCE")continue;const h=f(b),x=(U=T[h])!=null?U:[];x.push(b.id),T[h]=x}const I=Date.now()-r;let S=0;for(const{count:b}of c.values())b>1&&(S+=b-1);const y=ne(m,l,I,{instanceMergedCount:S});L.log(`Scan ${n} done: ${s.length} usages, ${l.length} unbound, ${I}ms`);const R={type:"render",byLayer:m,unbound:l,layerInfoMap:Object.fromEntries(w),instancesByName:T,noVariablesFound:s.length===0&&l.length===0,stats:y,scanDurationMs:I};figma.ui.postMessage(R)}function ce(){figma.showUI(s1.replace("</head>",`<style>${l1}</style></head>`),{width:300,height:400,title:"Variable Inspector",themeColors:!0}),figma.ui.onmessage=async n=>{if(n.type==="resize")figma.ui.resize(n.width,n.height);else if(n.type==="select-node"){const r=await figma.getNodeByIdAsync(n.nodeId);r&&(figma.currentPage.selection=[r],figma.viewport.scrollAndZoomIntoView([r]))}else if(n.type==="select-nodes"){const t=(await Promise.all(n.nodeIds.map(o=>figma.getNodeByIdAsync(o)))).filter(o=>o!==null);t.length>0&&(figma.currentPage.selection=t,figma.viewport.scrollAndZoomIntoView(t))}else n.type==="rescan"?B():n.type==="force-scan"&&B({force:!0})};let e=null;figma.on("selectionchange",()=>{e&&clearTimeout(e),e=setTimeout(()=>{B()},C1)}),B()}ce();
 //# sourceMappingURL=code.js.map

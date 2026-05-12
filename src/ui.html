@@ -177,15 +177,27 @@
 
     let sortModeMemory = 'byLayer';
     let filterMemory = { search: '', types: [], origins: [] };
+    // True once the user has explicitly picked a view mode. Until then, the
+    // first render auto-picks 'overview' for big selections so the dashboard
+    // surfaces upfront on heavy boards.
+    let sortModeUserChosen = false;
 
     function getSortMode() {
       try {
         const v = localStorage.getItem(SORT_KEY);
-        if (v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
+        if (v === 'overview' || v === 'byProperty' || v === 'byLayer' || v === 'unbound') return v;
       } catch (_) { /* data: URL — fallback below */ }
       return sortModeMemory;
     }
     function setSortMode(mode) {
+      sortModeMemory = mode;
+      sortModeUserChosen = true;
+      try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
+    }
+    // Used by the auto-pick logic on the first render: sets the mode without
+    // marking it as a user-driven choice, so a later large selection can still
+    // re-pick overview.
+    function setSortModeAuto(mode) {
       sortModeMemory = mode;
       try { localStorage.setItem(SORT_KEY, mode); } catch (_) { /* no-op */ }
     }
@@ -718,6 +730,7 @@
         </div>
         <div class="toolbar-row">
           <div class="fg-seg">
+            <button data-mode="overview">Aperçu</button>
             <button data-mode="byLayer">Calque</button>
             <button data-mode="byProperty">Propriété</button>
             <button data-mode="unbound">Unbound</button>
@@ -754,6 +767,14 @@
         if (btn.dataset.mode === currentSort) btn.classList.add('active');
         btn.addEventListener('click', () => {
           if (btn.dataset.mode === getSortMode()) return;
+          // Manual mode switch = clean navigation. Clear any leftover search
+          // (drill-downs or stale typing) so onglet bascule shows everything.
+          // Chips type/origin restent — l'utilisateur les pose explicitement.
+          const cur = getFilterState();
+          if (cur.search) {
+            cur.search = '';
+            setFilterState(cur);
+          }
           setSortMode(btn.dataset.mode);
           if (lastRender) handlePluginMessage(lastRender);
         });
@@ -807,10 +828,10 @@
     }
 
     // Applique le filter state à une entry unbound. Les unbound n'ont pas de
-    // type/origin (toujours hardcodé) — on ne filtre que par search sur layer
-    // + property + value. Les chips type/origin actifs masquent les unbound.
+    // type/origin (toujours hardcodé), donc les chips type/origin ne s'y
+    // appliquent pas — sinon l'onglet Unbound serait vide dès qu'un chip est
+    // actif. Seul le search filtre les unbound, sur layer + property + value.
     function matchesFilterUnbound(layer, item, filter) {
-      if (filter.types.length > 0 || filter.origins.length > 0) return false;
       const q = (filter.search || '').trim().toLowerCase();
       if (!q) return true;
       const hay = `${layer || ''} ${item.property || ''} ${String(item.value || '')}`.toLowerCase();
@@ -851,6 +872,331 @@
         </div>
       `;
       return dashboard;
+    }
+
+    // ------------------------------------------------------------------
+    // Overview / dashboard view (sortMode === 'overview')
+    // ------------------------------------------------------------------
+
+    // Builds an SVG coverage donut. radius/stroke kept simple so the
+    // computation is exact: arc length = 2πr × pct.
+    function buildCoverageDonut(coveragePct, size = 64) {
+      const r = (size / 2) - 6;
+      const c = 2 * Math.PI * r;
+      const arc = (coveragePct / 100) * c;
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+      svg.setAttribute('width', size);
+      svg.setAttribute('height', size);
+      svg.classList.add('overview-donut');
+      const track = document.createElementNS(ns, 'circle');
+      track.setAttribute('cx', size / 2);
+      track.setAttribute('cy', size / 2);
+      track.setAttribute('r', r);
+      track.setAttribute('fill', 'none');
+      track.setAttribute('stroke', 'var(--overview-donut-track, #e6e6e6)');
+      track.setAttribute('stroke-width', '6');
+      const arcEl = document.createElementNS(ns, 'circle');
+      arcEl.setAttribute('cx', size / 2);
+      arcEl.setAttribute('cy', size / 2);
+      arcEl.setAttribute('r', r);
+      arcEl.setAttribute('fill', 'none');
+      arcEl.setAttribute('stroke', 'var(--overview-donut-arc, #1969d2)');
+      arcEl.setAttribute('stroke-width', '6');
+      arcEl.setAttribute('stroke-linecap', 'round');
+      arcEl.setAttribute('stroke-dasharray', `${arc} ${c}`);
+      arcEl.setAttribute('transform', `rotate(-90 ${size / 2} ${size / 2})`);
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', size / 2);
+      label.setAttribute('y', size / 2 + 4);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '14');
+      label.setAttribute('font-weight', '600');
+      label.setAttribute('fill', 'currentColor');
+      label.textContent = `${coveragePct}%`;
+      svg.appendChild(track);
+      svg.appendChild(arcEl);
+      svg.appendChild(label);
+      return svg;
+    }
+
+    // Builds one "top hardcoded value" row. The pill mimics the unbound
+    // pill colours from the details list to reinforce visual mapping.
+    function renderTopHardcodedRow(item) {
+      const row = document.createElement('div');
+      row.className = 'overview-top-row';
+      const label = document.createElement('div');
+      label.className = 'overview-top-label';
+      const prop = document.createElement('span');
+      prop.className = 'overview-top-property';
+      prop.textContent = item.property;
+      const value = document.createElement('span');
+      value.className = 'overview-top-value';
+      value.textContent = item.value;
+      const count = document.createElement('span');
+      count.className = 'overview-top-count';
+      count.textContent = `× ${item.count}`;
+      label.appendChild(prop);
+      label.appendChild(value);
+      label.appendChild(count);
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'overview-top-action';
+      action.textContent = 'Sélectionner';
+      action.title = `Sélectionner les ${item.nodeIds.length} nœuds dans la canvas`;
+      action.addEventListener('click', () => {
+        parent.postMessage({
+          pluginMessage: { type: 'select-nodes', nodeIds: item.nodeIds },
+        }, '*');
+      });
+      row.appendChild(label);
+      row.appendChild(action);
+      return row;
+    }
+
+    // Mirrors computePropertyHealth() in src/ui/utils.ts. Duplicated here
+    // because ui.html is a static script — it cannot import the TS module.
+    // The TS version is the source of truth and has unit tests; keep them
+    // in sync if the contract changes.
+    function computePropertyHealthInline(byProperty, minTotal) {
+      const min = typeof minTotal === 'number' ? minTotal : 5;
+      let allBound = 0, partial = 0, allUnbound = 0;
+      for (const p of byProperty) {
+        const total = p.bound + p.unbound;
+        if (total === 0) continue;
+        if (p.unbound === 0) allBound += 1;
+        else if (p.bound === 0) allUnbound += 1;
+        else partial += 1;
+      }
+      const pool = byProperty.filter(p => (p.bound + p.unbound) >= min);
+      const candidates = pool.length > 0 ? pool : byProperty.filter(p => (p.bound + p.unbound) > 0);
+      const ratio = p => p.bound / (p.bound + p.unbound);
+      let best = null, worst = null;
+      for (const p of candidates) {
+        if (best === null || ratio(p) > ratio(best)) best = p;
+        if (worst === null || ratio(p) < ratio(worst)) worst = p;
+      }
+      return { allBound, partial, allUnbound, best, worst };
+    }
+
+    // Origin distribution mini-bar : single horizontal bar split local/external.
+    function renderOriginBar(stats) {
+      const local = stats.byOrigin.local || 0;
+      const external = stats.byOrigin.external || 0;
+      const total = local + external;
+      const pct = total === 0 ? 0 : Math.round((local / total) * 100);
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-distrib-row';
+      wrap.innerHTML = `
+        <span class="overview-distrib-label">Origine</span>
+        <span class="overview-distrib-bar" role="presentation">
+          <span class="overview-distrib-bar-fill" style="width:${pct}%"></span>
+        </span>
+        <span class="overview-distrib-meta">
+          <span class="overview-origin-local">${local} local</span>
+          · <span class="overview-origin-external">${external} ext.</span>
+        </span>
+      `;
+      return wrap;
+    }
+
+    // Types breakdown : 4 small chips with counts. Hides zero-count types so
+    // we never show "Boolean 0" noise.
+    function renderTypesBreakdown(stats) {
+      const types = [
+        { key: 'COLOR', label: 'Color' },
+        { key: 'FLOAT', label: 'Float' },
+        { key: 'STRING', label: 'String' },
+        { key: 'BOOLEAN', label: 'Bool' },
+      ];
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-distrib-row overview-distrib-types';
+      const label = document.createElement('span');
+      label.className = 'overview-distrib-label';
+      label.textContent = 'Types';
+      wrap.appendChild(label);
+      const list = document.createElement('span');
+      list.className = 'overview-types-list';
+      let anyShown = false;
+      for (const t of types) {
+        const count = stats.byType[t.key] || 0;
+        if (count === 0) continue;
+        anyShown = true;
+        const chip = document.createElement('span');
+        chip.className = `overview-type-chip overview-type-${t.key.toLowerCase()}`;
+        chip.innerHTML = `<strong>${count}</strong> ${t.label}`;
+        list.appendChild(chip);
+      }
+      if (!anyShown) {
+        const empty = document.createElement('span');
+        empty.className = 'overview-distrib-meta';
+        empty.textContent = 'Aucune variable';
+        wrap.appendChild(empty);
+      } else {
+        wrap.appendChild(list);
+      }
+      return wrap;
+    }
+
+    // 3-segment health bar : fully bound / partial / fully hardcoded counts
+    // across all properties. The legend below echoes the segment colours.
+    function renderHealthBar(health) {
+      const total = health.allBound + health.partial + health.allUnbound;
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-health';
+      const bar = document.createElement('div');
+      bar.className = 'overview-health-bar';
+      const seg = (cls, n) => {
+        const s = document.createElement('span');
+        s.className = `overview-health-seg ${cls}`;
+        s.style.width = total === 0 ? '0%' : `${(n / total) * 100}%`;
+        s.title = `${n} propriété${n > 1 ? 's' : ''}`;
+        return s;
+      };
+      bar.appendChild(seg('overview-health-bound', health.allBound));
+      bar.appendChild(seg('overview-health-partial', health.partial));
+      bar.appendChild(seg('overview-health-unbound', health.allUnbound));
+      wrap.appendChild(bar);
+      const legend = document.createElement('div');
+      legend.className = 'overview-health-legend';
+      legend.innerHTML = `
+        <span class="overview-health-legend-item overview-health-bound"><strong>${health.allBound}</strong> entièrement bound</span>
+        <span class="overview-health-legend-item overview-health-partial"><strong>${health.partial}</strong> partielle${health.partial > 1 ? 's' : ''}</span>
+        <span class="overview-health-legend-item overview-health-unbound"><strong>${health.allUnbound}</strong> entièrement hardcodée${health.allUnbound > 1 ? 's' : ''}</span>
+      `;
+      wrap.appendChild(legend);
+      return wrap;
+    }
+
+    // Two highlight rows : best / worst property by coverage ratio. Skip
+    // entirely when both extremes are null (no property has bound + unbound).
+    function renderBestWorstProperty(health) {
+      if (!health.best && !health.worst) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'overview-extremes';
+      const pct = p => {
+        const t = p.bound + p.unbound;
+        return t === 0 ? 0 : Math.round((p.bound / t) * 100);
+      };
+      if (health.best) {
+        const row = document.createElement('div');
+        row.className = 'overview-extreme-row overview-extreme-best';
+        row.innerHTML = `
+          <span class="overview-extreme-icon">✓</span>
+          <span class="overview-extreme-label">Meilleure</span>
+          <span class="overview-extreme-name">${escapeHtml(health.best.property)}</span>
+          <span class="overview-extreme-score">${pct(health.best)}% bound (${health.best.bound}/${health.best.bound + health.best.unbound})</span>
+        `;
+        wrap.appendChild(row);
+      }
+      // Avoid showing the same property twice when it is both best and worst.
+      if (health.worst && health.worst !== health.best) {
+        const row = document.createElement('div');
+        row.className = 'overview-extreme-row overview-extreme-worst';
+        row.innerHTML = `
+          <span class="overview-extreme-icon">!</span>
+          <span class="overview-extreme-label">À fixer</span>
+          <span class="overview-extreme-name">${escapeHtml(health.worst.property)}</span>
+          <span class="overview-extreme-score">${pct(health.worst)}% bound (${health.worst.bound}/${health.worst.bound + health.worst.unbound})</span>
+        `;
+        wrap.appendChild(row);
+      }
+      return wrap;
+    }
+
+    // Top-level overview renderer. 4 blocks max, scaled to selection size :
+    //  - compact (≤ 10 layers)  : bloc 1 seul
+    //  - medium  (11–50 layers) : blocs 1 + 2
+    //  - full    (> 50 layers)  : blocs 1 + 2 + 3 + 4
+    function renderOverview(container, stats) {
+      const wrap = document.createElement('div');
+      wrap.className = 'overview';
+      const density = stats.layerCount > 50 ? 'full' : stats.layerCount > 10 ? 'medium' : 'compact';
+      wrap.dataset.density = density;
+      const coveragePct = Math.round((stats.variableCoverage || 0) * 100);
+
+      // Bloc 1 — Coverage header (always).
+      const header = document.createElement('div');
+      header.className = 'overview-header';
+      header.appendChild(buildCoverageDonut(coveragePct, density === 'compact' ? 44 : 72));
+      const counters = document.createElement('div');
+      counters.className = 'overview-counters';
+      const merged = stats.instanceMergedCount || 0;
+      const mergedSuffix = merged > 0 ? ` · ${merged} instance${merged > 1 ? 's' : ''} dédup.` : '';
+      const scanLine = typeof stats.scanDurationMs === 'number'
+        ? `<div class="overview-counter-sub">Scan : ${(stats.scanDurationMs / 1000).toFixed(stats.scanDurationMs >= 1000 ? 1 : 2)} s</div>`
+        : '';
+      counters.innerHTML = `
+        <div class="overview-counter-main">
+          <strong>${stats.totalVariables}</strong> variables
+          · <strong>${stats.totalHardcoded}</strong> hardcodées
+        </div>
+        <div class="overview-counter-sub">
+          ${stats.layerCount} calque${stats.layerCount > 1 ? 's' : ''}${mergedSuffix}
+        </div>
+        ${scanLine}
+      `;
+      header.appendChild(counters);
+      wrap.appendChild(header);
+
+      if (density === 'compact') {
+        container.appendChild(wrap);
+        return;
+      }
+
+      // Bloc 2 — Distribution (origine + types).
+      const distrib = document.createElement('section');
+      distrib.className = 'overview-section overview-distrib';
+      distrib.appendChild(renderOriginBar(stats));
+      distrib.appendChild(renderTypesBreakdown(stats));
+      wrap.appendChild(distrib);
+
+      if (density === 'medium') {
+        container.appendChild(wrap);
+        return;
+      }
+
+      // Bloc 3 — Santé par propriété (full only).
+      const byProperty = stats.byProperty || [];
+      if (byProperty.length > 0) {
+        const health = computePropertyHealthInline(byProperty);
+        const healthSection = document.createElement('section');
+        healthSection.className = 'overview-section';
+        const healthTitle = document.createElement('h3');
+        healthTitle.className = 'overview-section-title';
+        healthTitle.textContent = 'Santé par propriété';
+        healthSection.appendChild(healthTitle);
+        healthSection.appendChild(renderHealthBar(health));
+        const extremes = renderBestWorstProperty(health);
+        if (extremes) healthSection.appendChild(extremes);
+        wrap.appendChild(healthSection);
+      }
+
+      // Bloc 4 — Top valeurs hardcodées (full only).
+      const top = stats.topHardcoded || [];
+      if (top.length > 0) {
+        const topSection = document.createElement('section');
+        topSection.className = 'overview-section';
+        const topTitle = document.createElement('h3');
+        topTitle.className = 'overview-section-title';
+        topTitle.textContent = 'Valeurs hardcodées récurrentes';
+        topSection.appendChild(topTitle);
+        const topList = document.createElement('div');
+        topList.className = 'overview-top';
+        // Cap at 5 in the overview to stay synthetic — full list is in the
+        // Unbound tab.
+        for (const item of top.slice(0, 5)) topList.appendChild(renderTopHardcodedRow(item));
+        topSection.appendChild(topList);
+        wrap.appendChild(topSection);
+      } else if (stats.totalHardcoded === 0) {
+        const ok = document.createElement('div');
+        ok.className = 'overview-empty-hint overview-empty-success';
+        ok.textContent = '✓ Aucune valeur hardcodée détectée.';
+        wrap.appendChild(ok);
+      }
+
+      container.appendChild(wrap);
     }
 
     // Rendu alternatif "Par propriété" : flatten bound entries across layers,
@@ -948,6 +1294,31 @@
       }
     }
 
+    // Removes the progress bar set up by ensureScanProgressBar(). Called on
+    // every full render and on errors so the bar never lingers.
+    function clearScanProgressBar() {
+      const existing = document.getElementById('vi-scan-progress');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    }
+
+    // Lazily mounts the live scan progress strip at the top of #app. Returns
+    // the strip element so callers can update its width/label in-place.
+    function ensureScanProgressBar() {
+      let strip = document.getElementById('vi-scan-progress');
+      if (strip) return strip;
+      const app = document.getElementById('app');
+      if (!app) return null;
+      strip = document.createElement('div');
+      strip.id = 'vi-scan-progress';
+      strip.className = 'vi-scan-progress';
+      strip.innerHTML = `
+        <div class="vi-scan-progress-bar"><span class="vi-scan-progress-fill" style="width:0%"></span></div>
+        <div class="vi-scan-progress-meta">Scan…</div>
+      `;
+      app.insertBefore(strip, app.firstChild || null);
+      return strip;
+    }
+
     function handlePluginMessage(msg) {
       if (!msg) return;
 
@@ -956,6 +1327,29 @@
       // précédent reste affiché pendant le scan.
       if (msg.type === 'scan-start') {
         document.querySelectorAll('.fg-rescan').forEach(b => b.classList.add('scanning'));
+        const strip = ensureScanProgressBar();
+        if (strip) {
+          const fill = strip.querySelector('.vi-scan-progress-fill');
+          if (fill) fill.style.width = '4%';
+          const meta = strip.querySelector('.vi-scan-progress-meta');
+          if (meta) meta.textContent = 'Scan en cours…';
+        }
+        return;
+      }
+
+      // Partial render : live progress + rolling counters during a long scan.
+      // Doesn't touch the main content area — the previous render stays put.
+      if (msg.type === 'partial-render') {
+        const strip = ensureScanProgressBar();
+        if (!strip) return;
+        const pct = Math.max(0, Math.min(100, Math.round((msg.progress || 0) * 100)));
+        const fill = strip.querySelector('.vi-scan-progress-fill');
+        if (fill) fill.style.width = `${pct}%`;
+        const meta = strip.querySelector('.vi-scan-progress-meta');
+        if (meta) {
+          const p = msg.statsPreview || {};
+          meta.textContent = `${pct}% · ${p.totalVariables || 0} liées · ${p.totalHardcoded || 0} hardcodées · ${p.layerCount || 0} calques`;
+        }
         return;
       }
 
@@ -998,6 +1392,17 @@
 
       lastRender = msg;
       let { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
+
+      // Auto-pick the Overview tab on the first render of a heavy selection
+      // so the dashboard surfaces upfront. Once the user picks a mode (via
+      // setSortMode), this auto-pick stays out of the way.
+      if (!sortModeUserChosen && stats && stats.layerCount > 50) {
+        setSortModeAuto('overview');
+      } else if (!sortModeUserChosen && stats && stats.layerCount <= 10 && getSortMode() === 'overview') {
+        // Symmetric: a tiny selection on a fresh session shouldn't be stuck
+        // on overview (it would feel empty). Fall back to byLayer.
+        setSortModeAuto('byLayer');
+      }
       // Dedup unbound entries within each layer name by
       // (effectGroup, subProp, property, value) tuple. Multiple identical
       // instances of a component (whether or not the plugin merged them via
@@ -1057,6 +1462,14 @@
           <p>Sélectionnez un élément avec des propriétés à inspecter.</p>
         `;
         container.appendChild(emptyMessage);
+        return;
+      }
+
+      // Overview tab short-circuits the list pipeline entirely : the
+      // dashboard owns the full content area. Toolbar above is enough for
+      // navigation back to the detail tabs.
+      if (getSortMode() === 'overview' && stats) {
+        renderOverview(container, stats);
         return;
       }
 

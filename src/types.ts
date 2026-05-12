@@ -117,6 +117,22 @@ export interface RenderMessage {
   scanDurationMs: number;
 }
 
+/**
+ * Sent by the plugin thread at chunk boundaries during a long scan so the UI
+ * can show live progress and rolling counters. Stats are partial — only the
+ * cheap-to-compute preview fields are populated.
+ */
+export interface PartialRenderMessage {
+  type: 'partial-render';
+  /** Scan progress in the 0..1 range. */
+  progress: number;
+  statsPreview: {
+    totalVariables: number;
+    totalHardcoded: number;
+    layerCount: number;
+  };
+}
+
 /** Sent by the plugin thread when an unrecoverable error occurs. */
 export interface ErrorMessage {
   type: 'error';
@@ -140,12 +156,27 @@ export interface TooLargeMessage {
 }
 
 /** Union of all messages the plugin thread can send to the UI. */
-export type PluginToUIMessage = RenderMessage | ErrorMessage | ScanStartMessage | TooLargeMessage;
+export type PluginToUIMessage =
+  | RenderMessage
+  | ErrorMessage
+  | ScanStartMessage
+  | TooLargeMessage
+  | PartialRenderMessage;
 
 /** Sent by the UI thread to select and focus a node in the canvas. */
 export interface SelectNodeMessage {
   type: 'select-node';
   nodeId: string;
+}
+
+/**
+ * Sent by the UI thread to select multiple nodes at once (e.g. all instances
+ * of a top hardcoded value). Selection focuses and zooms to the bounding box
+ * of the resolved set.
+ */
+export interface SelectNodesMessage {
+  type: 'select-nodes';
+  nodeIds: string[];
 }
 
 /** Sent by the UI thread to resize the plugin panel. */
@@ -172,12 +203,33 @@ export interface ForceScanMessage {
 /** Union of all messages the UI thread can send to the plugin thread. */
 export type UIToPluginMessage =
   | SelectNodeMessage
+  | SelectNodesMessage
   | ResizeMessage
   | RescanMessage
   | ForceScanMessage;
 
 /** Sort modes for the UI's main rendering. */
 export type SortMode = 'byLayer' | 'byProperty' | 'unbound';
+
+/** Bound + unbound counts for a single property, used for dashboard cards. */
+export interface PropertyAggregate {
+  property: string;
+  bound: number;
+  unbound: number;
+  byOrigin: { local: number; external: number };
+}
+
+/**
+ * A hardcoded value repeated across multiple layers, used for the dashboard's
+ * "Top violations" section. `nodeIds` lets the UI select all matching nodes
+ * at once via `SelectNodesMessage`.
+ */
+export interface TopHardcodedValue {
+  property: string;
+  value: string;
+  count: number;
+  nodeIds: string[];
+}
 
 /** Aggregate statistics computed by the plugin and rendered in the UI dashboard. */
 export interface ScanStats {
@@ -189,4 +241,10 @@ export interface ScanStats {
   byType: { COLOR: number; FLOAT: number; STRING: number; BOOLEAN: number };
   layerCount: number;
   scanDurationMs: number;
+  /** Per-property bound/unbound breakdown, sorted descending by (bound + unbound). */
+  byProperty: PropertyAggregate[];
+  /** Top N most-repeated hardcoded values across the selection. */
+  topHardcoded: TopHardcodedValue[];
+  /** Number of nodes skipped because they were merged into a representative instance. */
+  instanceMergedCount: number;
 }

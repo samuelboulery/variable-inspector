@@ -209,6 +209,8 @@ async function runInspector(force: boolean): Promise<void> {
   const mergedInfo = new Map<string, { count: number; nodeIds: string[] }>();
   const rawUsages: VariableUsage[] = [];
 
+  const totalGroups = groups.size;
+  const partialLayerIds = new Set<string>();
   let processed = 0;
   for (const [, bucket] of groups) {
     if (scanGeneration !== myGeneration) {
@@ -243,6 +245,7 @@ async function runInspector(force: boolean): Promise<void> {
       if (effectGroup !== undefined) entry.effectGroup = effectGroup;
       if (subProp !== undefined) entry.subProp = subProp;
       allUsages.push(entry);
+      partialLayerIds.add(representative.id);
     }
     getUnboundColorUsages(representative, unboundUsages);
     getUnboundFloatUsages(representative, unboundUsages);
@@ -250,6 +253,16 @@ async function runInspector(force: boolean): Promise<void> {
 
     processed += 1;
     if (processed % SCAN_YIELD_INTERVAL === 0) {
+      const partial: PluginToUIMessage = {
+        type: 'partial-render',
+        progress: totalGroups === 0 ? 1 : processed / totalGroups,
+        statsPreview: {
+          totalVariables: allUsages.length,
+          totalHardcoded: unboundUsages.length,
+          layerCount: partialLayerIds.size,
+        },
+      };
+      figma.ui.postMessage(partial);
       await yieldToScheduler();
     }
   }
@@ -301,7 +314,13 @@ async function runInspector(force: boolean): Promise<void> {
   }
 
   const scanDurationMs = Date.now() - startMs;
-  const stats = computeStats(byLayer, unboundUsages, scanDurationMs);
+  // Total nodes skipped by the fingerprint dedup pass — surfaced in the UI
+  // dashboard as a "× N instances dédupliquées" counter.
+  let instanceMergedCount = 0;
+  for (const { count } of mergedInfo.values()) {
+    if (count > 1) instanceMergedCount += count - 1;
+  }
+  const stats = computeStats(byLayer, unboundUsages, scanDurationMs, { instanceMergedCount });
 
   logger.log(
     `Scan ${myGeneration} done: ${allUsages.length} usages, ${unboundUsages.length} unbound, ${scanDurationMs}ms`,
@@ -340,6 +359,15 @@ function initializePlugin(): void {
       if (node) {
         figma.currentPage.selection = [node];
         figma.viewport.scrollAndZoomIntoView([node]);
+      }
+    } else if (msg.type === 'select-nodes') {
+      const resolved = await Promise.all(
+        msg.nodeIds.map(id => figma.getNodeByIdAsync(id) as Promise<SceneNode | null>),
+      );
+      const nodes = resolved.filter((n): n is SceneNode => n !== null);
+      if (nodes.length > 0) {
+        figma.currentPage.selection = nodes;
+        figma.viewport.scrollAndZoomIntoView(nodes);
       }
     } else if (msg.type === 'rescan') {
       void updateInspector();

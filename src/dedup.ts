@@ -22,9 +22,7 @@ export const processedProperties = new Set<string>();
  * @returns A pipe-delimited key string.
  */
 export function getPropertyId(nodeId: string, propertyName: string, variableId?: string): string {
-  return variableId
-    ? `${nodeId}|${propertyName}|${variableId}`
-    : `${nodeId}|${propertyName}`;
+  return variableId ? `${nodeId}|${propertyName}|${variableId}` : `${nodeId}|${propertyName}`;
 }
 
 /**
@@ -47,7 +45,9 @@ export function resetDedupSets(): void {
 export function trackProperty(nodeId: string, propertyName: string, variableId?: string): boolean {
   const propertyId = getPropertyId(nodeId, propertyName, variableId);
 
-  logger.log(`Checking property: ${propertyId}, propertyName: ${propertyName}, exists: ${processedProperties.has(propertyId)}`);
+  logger.log(
+    `Checking property: ${propertyId}, propertyName: ${propertyName}, exists: ${processedProperties.has(propertyId)}`,
+  );
 
   const isSpacing = SPACING_PROPERTY_KEYS.some(key => propertyName.includes(key));
   if (isSpacing) {

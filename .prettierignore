@@ -1,0 +1,7 @@
+dist
+node_modules
+coverage
+graphify-out
+src/ui.html
+src/style.css
+*.md

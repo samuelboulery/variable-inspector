@@ -8,17 +8,19 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'es2018',
+    minify: 'esbuild',
+    sourcemap: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'src/code.ts'),
       output: {
         entryFileNames: '[name].js',
-        assetFileNames: '[name][extname]'
-      }
-    }
+        assetFileNames: '[name][extname]',
+      },
+    },
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src')
-    }
-  }
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
 });

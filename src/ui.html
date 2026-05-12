@@ -26,10 +26,28 @@
       app.appendChild(errBox);
     });
 
-    // Gestion du redimensionnement
+    // Gestion du redimensionnement — throttle via requestAnimationFrame
+    // pour éviter de spammer postMessage à chaque pixel de mouvement (1 par
+    // frame maximum). Sur grosse sélection cela évite que le canal de
+    // messages plugin/UI se sature pendant un drag de resize.
     const resizeHandle = document.querySelector('.resize-handle');
     let isResizing = false;
     let startX, startY, startWidth, startHeight;
+    let pendingResize = null;
+    let rafScheduled = false;
+
+    function flushResize() {
+      rafScheduled = false;
+      if (!pendingResize) return;
+      parent.postMessage({
+        pluginMessage: {
+          type: 'resize',
+          width: pendingResize.width,
+          height: pendingResize.height
+        }
+      }, '*');
+      pendingResize = null;
+    }
 
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizing = true;
@@ -42,21 +60,18 @@
 
     document.addEventListener('mousemove', (e) => {
       if (!isResizing) return;
-
-      const width = Math.max(300, startWidth + (e.clientX - startX));
-      const height = Math.max(200, startHeight + (e.clientY - startY));
-
-      // Envoie le message de redimensionnement au plugin
-      parent.postMessage({
-        pluginMessage: {
-          type: 'resize',
-          width: width,
-          height: height
-        }
-      }, '*');
+      pendingResize = {
+        width: Math.max(300, startWidth + (e.clientX - startX)),
+        height: Math.max(200, startHeight + (e.clientY - startY))
+      };
+      if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(flushResize);
+      }
     });
 
     document.addEventListener('mouseup', () => {
+      if (isResizing && pendingResize) flushResize();
       isResizing = false;
     });
 
@@ -950,6 +965,37 @@
         return;
       }
 
+      // Sélection trop large : afficher un état dédié avec un bouton
+      // "Scanner quand même" qui bypasse le cap MAX_SCAN_NODES.
+      if (msg.type === 'too-large') {
+        document.querySelectorAll('.fg-rescan').forEach(b => b.classList.remove('scanning'));
+        const container = document.getElementById("app");
+        container.innerHTML = '';
+        const box = document.createElement('div');
+        box.style.cssText = 'padding:1.5rem;text-align:center;color:#666;';
+        const safeCount = Number(msg.nodeCount) || 0;
+        const safeLimit = Number(msg.limit) || 0;
+        const title = document.createElement('h3');
+        title.style.cssText = 'margin-bottom:0.5rem;color:#b87a00;';
+        title.textContent = 'Sélection trop grande';
+        const explain = document.createElement('p');
+        explain.style.cssText = 'margin-bottom:1rem;font-size:12px;';
+        explain.textContent = `${safeCount.toLocaleString('fr-FR')} nœuds détectés (limite : ${safeLimit.toLocaleString('fr-FR')}). Réduisez la sélection ou forcez le scan ci-dessous.`;
+        const btn = document.createElement('button');
+        btn.className = 'fg-rescan';
+        btn.style.cssText = 'padding:0.5rem 1rem;cursor:pointer;';
+        btn.textContent = 'Scanner quand même';
+        btn.addEventListener('click', () => {
+          btn.disabled = true;
+          parent.postMessage({ pluginMessage: { type: 'force-scan' } }, '*');
+        });
+        box.appendChild(title);
+        box.appendChild(explain);
+        box.appendChild(btn);
+        container.appendChild(box);
+        return;
+      }
+
       lastRender = msg;
       let { byLayer, unbound, layerInfoMap, instancesByName, stats, noVariablesFound } = msg;
       // Dedup unbound entries within each layer name by
@@ -1129,10 +1175,19 @@
       // Trier tous les calques selon l'ordre de Figma
       allLayersWithOrderInfo.sort((a, b) => a.order - b.order);
 
-      // Afficher toutes les sections pour chaque calque
-      for (const { layerName, items, unboundItems, layerId } of allLayersWithOrderInfo) {
-        // Ne créer une section que si le calque a des variables liées ou non liées
-        if ((items && items.length > 0) || (unboundItems && unboundItems.length > 0)) {
+      // Virtualisation progressive — sur grosse sélection (>50 sections), on
+      // ne pose dans le DOM que les VIRT_INITIAL premières sections puis on
+      // ajoute les suivantes par lots de VIRT_BATCH dès qu'un sentinel placé
+      // en bas de liste devient visible. Garde l'UI fluide sur des panels de
+      // plusieurs milliers de calques.
+      const VIRT_INITIAL = 50;
+      const VIRT_BATCH = 30;
+      const renderableLayers = allLayersWithOrderInfo.filter(
+        l => (l.items && l.items.length > 0) || (l.unboundItems && l.unboundItems.length > 0)
+      );
+
+      const buildSection = ({ layerName, items, unboundItems, layerId }) => {
+        {
           const section = document.createElement("div");
           section.className = "layer-section";
 
@@ -1235,9 +1290,57 @@
             section.appendChild(effectGroupsBlock);
           }
 
+          return section;
+        }
+      };
 
+      // Première vague : rendre VIRT_INITIAL sections immédiatement.
+      const initialCount = Math.min(VIRT_INITIAL, renderableLayers.length);
+      for (let i = 0; i < initialCount; i++) {
+        const sec = buildSection(renderableLayers[i]);
+        if (sec) container.appendChild(sec);
+      }
 
-          container.appendChild(section);
+      // Vagues suivantes : un sentinel IntersectionObserver charge les
+      // batches restants au fur et à mesure que l'utilisateur scrolle.
+      if (initialCount < renderableLayers.length) {
+        let cursor = initialCount;
+        const sentinel = document.createElement('div');
+        sentinel.className = 'virt-sentinel';
+        sentinel.style.cssText = 'height:1px;';
+        container.appendChild(sentinel);
+
+        const flushBatch = () => {
+          const end = Math.min(cursor + VIRT_BATCH, renderableLayers.length);
+          for (let i = cursor; i < end; i++) {
+            const sec = buildSection(renderableLayers[i]);
+            if (sec) container.insertBefore(sec, sentinel);
+          }
+          cursor = end;
+          if (cursor >= renderableLayers.length && sentinel.parentNode) {
+            sentinel.parentNode.removeChild(sentinel);
+          }
+        };
+
+        if (typeof IntersectionObserver === 'function') {
+          const io = new IntersectionObserver(entries => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                flushBatch();
+                if (cursor >= renderableLayers.length) io.disconnect();
+              }
+            }
+          }, { rootMargin: '200px' });
+          io.observe(sentinel);
+        } else {
+          // Fallback IE/old runtime : rend tout en idle batches.
+          const tick = () => {
+            flushBatch();
+            if (cursor < renderableLayers.length) {
+              (window.requestIdleCallback || window.setTimeout)(tick, 16);
+            }
+          };
+          (window.requestIdleCallback || window.setTimeout)(tick, 16);
         }
       }
     }

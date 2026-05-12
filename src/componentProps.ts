@@ -1,6 +1,6 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { VariableUsage } from './types';
+import type { VariableUsage } from './types';
 import { getLayerDisplayName } from './utils/displayName';
 
 type InstanceWithCompPropBindings = InstanceNode & {

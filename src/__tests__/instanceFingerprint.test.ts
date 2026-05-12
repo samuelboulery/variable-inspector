@@ -14,7 +14,12 @@ function makeInstance(overrides: {
     name: 'Inst',
     type: overrides.type ?? 'INSTANCE',
     mainComponent: overrides.componentId
-      ? { id: overrides.componentId, parent: overrides.componentSetId ? { id: overrides.componentSetId, type: 'COMPONENT_SET' } : null }
+      ? {
+          id: overrides.componentId,
+          parent: overrides.componentSetId
+            ? { id: overrides.componentSetId, type: 'COMPONENT_SET' }
+            : null,
+        }
       : null,
     componentProperties: overrides.componentProperties ?? {},
     boundVariables: overrides.boundVariables ?? {},
@@ -23,8 +28,16 @@ function makeInstance(overrides: {
 
 describe('computeFingerprint', () => {
   it('returns the same hash for two instances with identical state', () => {
-    const a = makeInstance({ id: 'a', componentId: 'c1', componentProperties: { State: { type: 'VARIANT', value: 'default' } } });
-    const b = makeInstance({ id: 'b', componentId: 'c1', componentProperties: { State: { type: 'VARIANT', value: 'default' } } });
+    const a = makeInstance({
+      id: 'a',
+      componentId: 'c1',
+      componentProperties: { State: { type: 'VARIANT', value: 'default' } },
+    });
+    const b = makeInstance({
+      id: 'b',
+      componentId: 'c1',
+      componentProperties: { State: { type: 'VARIANT', value: 'default' } },
+    });
     expect(computeFingerprint(a)).toBe(computeFingerprint(b));
   });
 
@@ -35,8 +48,16 @@ describe('computeFingerprint', () => {
   });
 
   it('returns different hashes when component property values differ', () => {
-    const a = makeInstance({ id: 'a', componentId: 'c1', componentProperties: { State: { type: 'VARIANT', value: 'default' } } });
-    const b = makeInstance({ id: 'b', componentId: 'c1', componentProperties: { State: { type: 'VARIANT', value: 'hover' } } });
+    const a = makeInstance({
+      id: 'a',
+      componentId: 'c1',
+      componentProperties: { State: { type: 'VARIANT', value: 'default' } },
+    });
+    const b = makeInstance({
+      id: 'b',
+      componentId: 'c1',
+      componentProperties: { State: { type: 'VARIANT', value: 'hover' } },
+    });
     expect(computeFingerprint(a)).not.toBe(computeFingerprint(b));
   });
 
@@ -47,8 +68,16 @@ describe('computeFingerprint', () => {
   });
 
   it('is order-independent for componentProperties keys', () => {
-    const a = makeInstance({ id: 'a', componentId: 'c1', componentProperties: { A: { type: 'BOOL', value: true }, B: { type: 'BOOL', value: false } } });
-    const b = makeInstance({ id: 'b', componentId: 'c1', componentProperties: { B: { type: 'BOOL', value: false }, A: { type: 'BOOL', value: true } } });
+    const a = makeInstance({
+      id: 'a',
+      componentId: 'c1',
+      componentProperties: { A: { type: 'BOOL', value: true }, B: { type: 'BOOL', value: false } },
+    });
+    const b = makeInstance({
+      id: 'b',
+      componentId: 'c1',
+      componentProperties: { B: { type: 'BOOL', value: false }, A: { type: 'BOOL', value: true } },
+    });
     expect(computeFingerprint(a)).toBe(computeFingerprint(b));
   });
 
@@ -69,7 +98,9 @@ describe('groupByFingerprint', () => {
     const b = makeInstance({ id: 'b', componentId: 'c1' });
     const c = makeInstance({ id: 'c', componentId: 'c2' });
     const result = groupByFingerprint([a, b, c]);
-    const groupSizes = Array.from(result.values()).map(v => v.length).sort();
+    const groupSizes = Array.from(result.values())
+      .map(v => v.length)
+      .sort();
     expect(groupSizes).toEqual([1, 2]);
   });
 

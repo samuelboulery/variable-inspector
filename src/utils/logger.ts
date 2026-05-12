@@ -1,10 +1,15 @@
+/* eslint-disable no-console */
+// `process` is injected by Vite's `define` at build time. The logger is the
+// single sanctioned place to call `console.*` — all other call sites must go
+// through this wrapper so production builds stay silent.
+
 /**
  * Determines whether the plugin is running in a production build.
  * Vite replaces `process.env.NODE_ENV` with the literal string at build time.
  */
 function detectProductionMode(): boolean {
   try {
-    return process.env.NODE_ENV === 'production';
+    return typeof process !== 'undefined' && process.env.NODE_ENV === 'production';
   } catch {
     return false;
   }

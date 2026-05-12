@@ -79,3 +79,42 @@ export const SPACING_PROPERTY_KEYS = [
   'Padding Bottom',
   'Gap',
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Performance / safety caps — tuned for large selections on modest hardware.
+// ---------------------------------------------------------------------------
+
+/**
+ * Number of nodes processed between scheduler yields during the main scan
+ * loop. Lower values keep the plugin thread responsive at the cost of a
+ * slightly longer wall-clock scan time.
+ */
+export const SCAN_YIELD_INTERVAL = 200;
+
+/**
+ * Hard upper bound on the number of nodes a single scan will inspect. When
+ * the selection's flattened tree exceeds this, the plugin reports a
+ * `too-large` message to the UI and aborts the scan to keep Figma responsive
+ * on weak machines.
+ */
+export const MAX_SCAN_NODES = 8000;
+
+/**
+ * Maximum alias-chain depth when resolving a variable's structural path.
+ * Prevents infinite recursion on circular alias references.
+ */
+export const ALIAS_DEPTH_CAP = 10;
+
+/**
+ * Maximum recursion depth allowed when walking a `boundVariables` subtree
+ * to harvest nested `{ id }` bindings. The traversal is iterative; the cap
+ * is a defensive safety net for pathological / cyclic structures.
+ */
+export const EXTRACT_BINDING_MAX_DEPTH = 20;
+
+/**
+ * Selection-change debounce in milliseconds. Lower values make the panel
+ * feel snappier but waste CPU during a drag-select; higher values reduce
+ * CPU pressure on large boards.
+ */
+export const SELECTION_DEBOUNCE_MS = 250;

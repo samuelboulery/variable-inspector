@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { formatEffectType, collectAllNodes, inspectNode, getLayerDisplayName } from '../nodeScanner';
+import {
+  formatEffectType,
+  collectAllNodes,
+  inspectNode,
+  getLayerDisplayName,
+} from '../nodeScanner';
 import { resetDedupSets } from '../dedup';
 import { figmaMock, makeRectNode, makeFrameNode, makeTextNode } from '../__mocks__/figma';
 
@@ -142,10 +147,12 @@ describe('inspectNode', () => {
     const node = makeRectNode({
       id: 'n1',
       name: 'Card',
-      effects: [{
-        type: 'DROP_SHADOW',
-        boundVariables: { radius: { id: 'var-radius-1' } },
-      }],
+      effects: [
+        {
+          type: 'DROP_SHADOW',
+          boundVariables: { radius: { id: 'var-radius-1' } },
+        },
+      ],
     });
     const usages = inspectNode(node);
     expect(usages).toHaveLength(1);
@@ -286,8 +293,15 @@ describe('getLayerDisplayName', () => {
 
   it('walks the parent chain when the node name is a Figma sublayer ID', () => {
     const grandparent = { name: 'Card Component', type: 'COMPONENT' } as unknown as BaseNode;
-    const parent = { name: '120:11083', type: 'INSTANCE', parent: grandparent } as unknown as BaseNode;
-    const node = { ...makeRectNode({ id: 'n1', name: '120:11084' }), parent } as unknown as SceneNode;
+    const parent = {
+      name: '120:11083',
+      type: 'INSTANCE',
+      parent: grandparent,
+    } as unknown as BaseNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '120:11084' }),
+      parent,
+    } as unknown as SceneNode;
     expect(getLayerDisplayName(node)).toBe('Card Component');
   });
 
@@ -296,7 +310,10 @@ describe('getLayerDisplayName', () => {
     const doc = { name: 'Doc', type: 'DOCUMENT', parent: null } as unknown as BaseNode;
     const directParent = { name: '50:60', type: 'FRAME', parent: page } as unknown as BaseNode;
     (page as unknown as { parent: BaseNode }).parent = doc;
-    const node = { ...makeRectNode({ id: 'n1', name: '70:80' }), parent: directParent } as unknown as SceneNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '70:80' }),
+      parent: directParent,
+    } as unknown as SceneNode;
     // No real ancestor name found → falls back to formatted type label
     expect(getLayerDisplayName(node)).toBe('Rectangle');
   });
@@ -309,14 +326,21 @@ describe('getLayerDisplayName', () => {
       (current as unknown as { parent: BaseNode }).parent = parent;
       current = parent;
     }
-    const node = { ...makeRectNode({ id: 'n1', name: '100:100' }), parent: current } as unknown as SceneNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '100:100' }),
+      parent: current,
+    } as unknown as SceneNode;
     // No real ancestor reachable within depth 10 → fallback to type
     expect(getLayerDisplayName(node)).toBe('Rectangle');
   });
 
   it('uses the COMPONENT_SET parent name for a COMPONENT with Figma-ID name', () => {
     const set = { name: 'Button Variants', type: 'COMPONENT_SET' } as unknown as BaseNode;
-    const node = { ...makeRectNode({ id: 'n1', name: '10:20' }), type: 'COMPONENT', parent: set } as unknown as SceneNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '10:20' }),
+      type: 'COMPONENT',
+      parent: set,
+    } as unknown as SceneNode;
     expect(getLayerDisplayName(node)).toBe('Button Variants');
   });
 
@@ -342,9 +366,17 @@ describe('getLayerDisplayName', () => {
   });
 
   it('resolves I-prefixed sublayer IDs by looking up the embedded instance node', () => {
-    const container = { id: '120:11085', name: 'Card', type: 'FRAME', parent: null } as unknown as SceneNode;
-    figmaMock.getNodeById = (id: string) => (id === '120:11085' ? (container as unknown as BaseNode) : null);
-    const node = { ...makeRectNode({ id: 'n1', name: 'I120:11085;62:3213' }) } as unknown as SceneNode;
+    const container = {
+      id: '120:11085',
+      name: 'Card',
+      type: 'FRAME',
+      parent: null,
+    } as unknown as SceneNode;
+    figmaMock.getNodeById = (id: string) =>
+      id === '120:11085' ? (container as unknown as BaseNode) : null;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: 'I120:11085;62:3213' }),
+    } as unknown as SceneNode;
     expect(getLayerDisplayName(node)).toBe('Card');
   });
 
@@ -354,7 +386,10 @@ describe('getLayerDisplayName', () => {
   });
 
   it('formats multi-word node types (FRAME → "Frame", AUTO_LAYOUT → "Auto layout")', () => {
-    const node = { ...makeRectNode({ id: 'n1', name: '1:1' }), type: 'AUTO_LAYOUT' } as unknown as SceneNode;
+    const node = {
+      ...makeRectNode({ id: 'n1', name: '1:1' }),
+      type: 'AUTO_LAYOUT',
+    } as unknown as SceneNode;
     expect(getLayerDisplayName(node)).toBe('Auto layout');
   });
 });
@@ -371,7 +406,9 @@ describe('selectionchange debounce', () => {
       let t: ReturnType<typeof setTimeout> | null = null;
       return () => {
         if (t) clearTimeout(t);
-        t = setTimeout(() => { scanCount++; }, 300);
+        t = setTimeout(() => {
+          scanCount++;
+        }, 300);
       };
     })();
     debouncedScan();

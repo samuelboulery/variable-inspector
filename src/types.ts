@@ -128,8 +128,19 @@ export interface ScanStartMessage {
   type: 'scan-start';
 }
 
+/**
+ * Sent by the plugin thread when the flattened selection exceeds
+ * `MAX_SCAN_NODES`. The UI must render an explanatory state and offer a
+ * "scan anyway" override.
+ */
+export interface TooLargeMessage {
+  type: 'too-large';
+  nodeCount: number;
+  limit: number;
+}
+
 /** Union of all messages the plugin thread can send to the UI. */
-export type PluginToUIMessage = RenderMessage | ErrorMessage | ScanStartMessage;
+export type PluginToUIMessage = RenderMessage | ErrorMessage | ScanStartMessage | TooLargeMessage;
 
 /** Sent by the UI thread to select and focus a node in the canvas. */
 export interface SelectNodeMessage {
@@ -149,8 +160,21 @@ export interface RescanMessage {
   type: 'rescan';
 }
 
+/**
+ * Sent by the UI thread to force a scan even when the selection exceeds
+ * the safety cap (`MAX_SCAN_NODES`). Equivalent to `rescan` but bypasses
+ * the `too-large` guard.
+ */
+export interface ForceScanMessage {
+  type: 'force-scan';
+}
+
 /** Union of all messages the UI thread can send to the plugin thread. */
-export type UIToPluginMessage = SelectNodeMessage | ResizeMessage | RescanMessage;
+export type UIToPluginMessage =
+  | SelectNodeMessage
+  | ResizeMessage
+  | RescanMessage
+  | ForceScanMessage;
 
 /** Sort modes for the UI's main rendering. */
 export type SortMode = 'byLayer' | 'byProperty' | 'unbound';

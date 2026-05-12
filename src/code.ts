@@ -2,17 +2,35 @@
 import uiHtml from './ui.html?raw';
 import css from './style.css?raw';
 
-import { FullUsageEntry, UnboundUsage, LayerInfo, PluginToUIMessage, UIToPluginMessage } from './types';
-import { SPACING_PROPERTY_KEYS } from './constants';
+import type {
+  FullUsageEntry,
+  UnboundUsage,
+  LayerInfo,
+  PluginToUIMessage,
+  UIToPluginMessage,
+  VariableUsage,
+} from './types';
+import {
+  SPACING_PROPERTY_KEYS,
+  SCAN_YIELD_INTERVAL,
+  MAX_SCAN_NODES,
+  SELECTION_DEBOUNCE_MS,
+} from './constants';
 import { resetDedupSets } from './dedup';
 import { loadVariables } from './variableLoader';
 import { inspectNode, collectAllNodes } from './nodeScanner';
 import { getLayerDisplayName } from './utils/displayName';
-import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from './unboundDetector';
+import {
+  getUnboundColorUsages,
+  getUnboundFloatUsages,
+  getUnboundEffectUsages,
+} from './unboundDetector';
 import { groupByFingerprint } from './instanceFingerprint';
 import { collectMergedAwayDescendantIds } from './mergedInstanceExclusion';
 import { logger } from './utils/logger';
 import { computeStats } from './ui/utils';
+import { resetVariableCachesForScan } from './variablePathResolver';
+import { yieldToScheduler } from './utils/scheduler';
 
 /**
  * Determines the display layer type for a scene node.
@@ -35,7 +53,7 @@ function getLayerType(node: SceneNode): string {
 
 /**
  * Builds the layer info map from bound and unbound usage entries.
- * Each unique `layerId` is resolved once via `figma.getNodeById`.
+ * Each unique `layerId` is resolved once via `figma.getNodeByIdAsync`.
  *
  * @param allUsages - Enriched variable usage entries.
  * @param unboundUsages - Hardcoded property entries.
@@ -82,10 +100,12 @@ async function buildLayerInfoMap(
   }
   for (let idx = 0; idx < allUsages.length; idx++) {
     const u = allUsages[idx];
+    if (!u) continue;
     await tryAdd(u.layerId, u.layer, mergedOrder + idx);
   }
   for (let idx = 0; idx < unboundUsages.length; idx++) {
     const u = unboundUsages[idx];
+    if (!u) continue;
     await tryAdd(u.layerId, u.layer, mergedOrder + allUsages.length + idx);
   }
 
@@ -93,16 +113,14 @@ async function buildLayerInfoMap(
 }
 
 /**
- * Groups a flat array of usage entries by layer name, deduplicating within each layer.
+ * Groups a flat array of usage entries by layer ID, deduplicating within each layer.
  * Spacing properties are never deduplicated.
  *
  * @param allUsages - All variable usage entries to group.
- * @returns Object mapping layer name to its deduplicated usage list.
+ * @returns Object mapping layer ID to its deduplicated usage list.
  */
 function groupUsagesByLayer(allUsages: FullUsageEntry[]): Record<string, FullUsageEntry[]> {
   const byLayerId: Record<string, FullUsageEntry[]> = {};
-  logger.log(`Grouping ${allUsages.length} usages by layer`);
-
   const processedLayerProperties = new Map<string, Set<string>>();
 
   const sortedUsages = [...allUsages].sort((a, b) => {
@@ -111,37 +129,40 @@ function groupUsagesByLayer(allUsages: FullUsageEntry[]): Record<string, FullUsa
   });
 
   for (const usage of sortedUsages) {
-    if (!byLayerId[usage.layerId]) {
+    const bucket = byLayerId[usage.layerId];
+    let seen = processedLayerProperties.get(usage.layerId);
+    if (!bucket || !seen) {
       byLayerId[usage.layerId] = [];
-      processedLayerProperties.set(usage.layerId, new Set<string>());
+      seen = new Set<string>();
+      processedLayerProperties.set(usage.layerId, seen);
     }
 
-    const seen = processedLayerProperties.get(usage.layerId)!;
     const propertyKey = `${usage.property}_${usage.id ?? ''}`;
     const isSpacing = SPACING_PROPERTY_KEYS.some(key => usage.property.includes(key));
 
-    logger.log(`Layer: ${usage.layer}, Property: ${usage.property}, isSpacing: ${isSpacing}, isDuplicate: ${seen.has(propertyKey)}`);
-
     if (!seen.has(propertyKey) || isSpacing) {
-      byLayerId[usage.layerId].push(usage);
+      (byLayerId[usage.layerId] ??= []).push(usage);
       seen.add(propertyKey);
     }
-  }
-
-  for (const [layerId, usages] of Object.entries(byLayerId)) {
-    logger.log(`Layer ${layerId}: ${usages.length} usages after grouping`);
   }
 
   return byLayerId;
 }
 
 /**
+ * Monotonically increasing token used to abandon stale scans when the user
+ * changes the selection mid-flight. Each scan reads the snapshot at start
+ * and bails out at chunk boundaries if it has been superseded.
+ */
+let scanGeneration = 0;
+
+/**
  * Runs the full inspection pass on the current Figma selection and posts the result to the UI.
  * Resets deduplication state before each run.
  */
-async function updateInspector(): Promise<void> {
+async function updateInspector(options?: { force?: boolean }): Promise<void> {
   try {
-    await runInspector();
+    await runInspector(options?.force === true);
   } catch (err) {
     logger.error('updateInspector error', err);
     const errorMsg: PluginToUIMessage = { type: 'error', message: String(err) };
@@ -149,24 +170,54 @@ async function updateInspector(): Promise<void> {
   }
 }
 
-async function runInspector(): Promise<void> {
+/**
+ * Inspects every node in the selection and dispatches the result to the UI.
+ *
+ * The work is chunked: every `SCAN_YIELD_INTERVAL` representative nodes the
+ * loop yields to the host scheduler so Figma stays responsive on large
+ * selections. A monotonic `scanGeneration` token lets a newer scan abort
+ * the in-flight pass at the next chunk boundary.
+ *
+ * @param force - When true, bypasses the `MAX_SCAN_NODES` safety cap.
+ */
+async function runInspector(force: boolean): Promise<void> {
+  scanGeneration += 1;
+  const myGeneration = scanGeneration;
+
   resetDedupSets();
+  resetVariableCachesForScan();
   const startMs = Date.now();
   figma.ui.postMessage({ type: 'scan-start' } as PluginToUIMessage);
 
-  const vars = await loadVariables();
   const selection = figma.currentPage.selection;
   const allNodes = collectAllNodes(selection);
+
+  if (!force && allNodes.length > MAX_SCAN_NODES) {
+    const tooLargeMsg: PluginToUIMessage = {
+      type: 'too-large',
+      nodeCount: allNodes.length,
+      limit: MAX_SCAN_NODES,
+    };
+    figma.ui.postMessage(tooLargeMsg);
+    return;
+  }
 
   const groups = groupByFingerprint(allNodes);
   const excluded = collectMergedAwayDescendantIds(groups);
   const allUsages: FullUsageEntry[] = [];
   const unboundUsages: UnboundUsage[] = [];
   const mergedInfo = new Map<string, { count: number; nodeIds: string[] }>();
+  const rawUsages: VariableUsage[] = [];
 
+  let processed = 0;
   for (const [, bucket] of groups) {
+    if (scanGeneration !== myGeneration) {
+      logger.log('Scan superseded — aborting');
+      return;
+    }
+
     const representative = bucket[0];
-    if (excluded.has(representative.id)) continue;
+    if (!representative || excluded.has(representative.id)) continue;
     const isMerged = bucket.length > 1 && representative.type === 'INSTANCE';
 
     if (isMerged) {
@@ -178,20 +229,61 @@ async function runInspector(): Promise<void> {
 
     const nodeUsages = inspectNode(representative);
     for (const usage of nodeUsages) {
+      rawUsages.push(usage);
       const { layer, property, id, effectGroup, subProp } = usage;
-      const def = vars.get(id);
-      allUsages.push(
-        def
-          ? { layer, layerId: representative.id, property, name: def.name, type: def.type, origin: def.origin, colorValue: def.colorValue, id, path: def.path, effectGroup, subProp }
-          : { layer, layerId: representative.id, property, name: id, type: 'STRING', origin: 'external', id, effectGroup, subProp },
-      );
+      const entry: FullUsageEntry = {
+        layer,
+        layerId: representative.id,
+        property,
+        name: id,
+        type: 'STRING',
+        origin: 'external',
+        id,
+      };
+      if (effectGroup !== undefined) entry.effectGroup = effectGroup;
+      if (subProp !== undefined) entry.subProp = subProp;
+      allUsages.push(entry);
     }
     getUnboundColorUsages(representative, unboundUsages);
     getUnboundFloatUsages(representative, unboundUsages);
     getUnboundEffectUsages(representative, unboundUsages);
+
+    processed += 1;
+    if (processed % SCAN_YIELD_INTERVAL === 0) {
+      await yieldToScheduler();
+    }
+  }
+
+  // Resolve variable metadata after the node scan so the loader can reuse
+  // the already-collected nodes/usages instead of re-traversing the tree.
+  const vars = await loadVariables({ allNodes, usages: rawUsages });
+  if (scanGeneration !== myGeneration) return;
+
+  // Enrich each usage entry with the resolved variable definition. Entries
+  // were initialised with placeholder metadata above; replace in place.
+  for (let i = 0; i < allUsages.length; i++) {
+    const entry = allUsages[i];
+    if (!entry) continue;
+    const def = vars.get(entry.id);
+    if (!def) continue;
+    const enriched: FullUsageEntry = {
+      layer: entry.layer,
+      layerId: entry.layerId,
+      property: entry.property,
+      name: def.name,
+      type: def.type,
+      origin: def.origin,
+      id: entry.id,
+    };
+    if (def.colorValue !== undefined) enriched.colorValue = def.colorValue;
+    if (def.path !== undefined) enriched.path = def.path;
+    if (entry.effectGroup !== undefined) enriched.effectGroup = entry.effectGroup;
+    if (entry.subProp !== undefined) enriched.subProp = entry.subProp;
+    allUsages[i] = enriched;
   }
 
   const layerInfoMap = await buildLayerInfoMap(allUsages, unboundUsages, mergedInfo);
+  if (scanGeneration !== myGeneration) return;
   const byLayer = groupUsagesByLayer(allUsages);
 
   // Count INSTANCE nodes grouped by display name — independent of the
@@ -208,13 +300,12 @@ async function runInspector(): Promise<void> {
     instancesByName[name] = list;
   }
 
-  logger.log('Final usages count:', allUsages.length);
-  logger.log('Layers with variables:', Object.keys(byLayer).length);
-  logger.log('Unbound usages count:', unboundUsages.length);
-  logger.log('Total nodes in layerInfoMap:', layerInfoMap.size);
-
   const scanDurationMs = Date.now() - startMs;
   const stats = computeStats(byLayer, unboundUsages, scanDurationMs);
+
+  logger.log(
+    `Scan ${myGeneration} done: ${allUsages.length} usages, ${unboundUsages.length} unbound, ${scanDurationMs}ms`,
+  );
 
   const msg: PluginToUIMessage = {
     type: 'render',
@@ -251,17 +342,21 @@ function initializePlugin(): void {
         figma.viewport.scrollAndZoomIntoView([node]);
       }
     } else if (msg.type === 'rescan') {
-      updateInspector();
+      void updateInspector();
+    } else if (msg.type === 'force-scan') {
+      void updateInspector({ force: true });
     }
   };
 
   let scanTimeout: ReturnType<typeof setTimeout> | null = null;
   figma.on('selectionchange', () => {
     if (scanTimeout) clearTimeout(scanTimeout);
-    scanTimeout = setTimeout(() => { updateInspector(); }, 300);
+    scanTimeout = setTimeout(() => {
+      void updateInspector();
+    }, SELECTION_DEBOUNCE_MS);
   });
 
-  updateInspector();
+  void updateInspector();
 }
 
 initializePlugin();

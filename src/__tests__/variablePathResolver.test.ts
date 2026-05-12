@@ -9,13 +9,24 @@ beforeEach(() => {
 });
 
 function makeCollection(id: string, name: string, variableIds: string[]): VariableCollection {
-  return { id, name, variableIds, modes: [], defaultModeId: 'm', remote: false, hiddenFromPublishing: false, key: 'k' } as unknown as VariableCollection;
+  return {
+    id,
+    name,
+    variableIds,
+    modes: [],
+    defaultModeId: 'm',
+    remote: false,
+    hiddenFromPublishing: false,
+    key: 'k',
+  } as unknown as VariableCollection;
 }
 
 describe('resolveVariablePath — local', () => {
   it('parses groups from a slash-separated variable name', async () => {
     const v = makeVariable({ id: 'v1', name: 'Color/Brand/primary' });
-    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection('col-1', 'Tokens', ['v1'])];
+    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [
+      makeCollection('col-1', 'Tokens', ['v1']),
+    ];
     figmaMock.variables.getVariableByIdAsync = async () => v;
     const path = await resolveVariablePath(v, false);
     expect(path).toEqual({
@@ -28,7 +39,9 @@ describe('resolveVariablePath — local', () => {
 
   it('handles a variable with no group (single segment)', async () => {
     const v = makeVariable({ id: 'v1', name: 'spacing' });
-    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection('col-1', 'Tokens', ['v1'])];
+    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [
+      makeCollection('col-1', 'Tokens', ['v1']),
+    ];
     figmaMock.variables.getVariableByIdAsync = async () => v;
     const path = await resolveVariablePath(v, false);
     expect(path?.groups).toEqual([]);
@@ -54,7 +67,11 @@ describe('resolveVariablePath — external', () => {
 
 describe('resolveVariablePath — alias chain', () => {
   it('marks isAlias true and follows the chain to the leaf', async () => {
-    const { root, resolve } = makeAliasChain({ rootId: 'a', leafId: 'b', leafValue: { r: 1, g: 0, b: 0 } });
+    const { root, resolve } = makeAliasChain({
+      rootId: 'a',
+      leafId: 'b',
+      leafValue: { r: 1, g: 0, b: 0 },
+    });
     figmaMock.variables.getVariableByIdAsync = resolve;
     const path = await resolveVariablePath(root, false);
     expect(path?.isAlias).toBe(true);

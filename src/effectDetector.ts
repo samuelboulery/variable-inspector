@@ -1,6 +1,6 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { UnboundUsage } from './types';
+import type { UnboundUsage } from './types';
 import { formatEffectType } from './nodeScanner';
 import { getLayerDisplayName } from './utils/displayName';
 
@@ -45,7 +45,7 @@ export function getUnboundEffectUsages(node: SceneNode, unboundUsages: UnboundUs
   const seenIdx: Record<string, number> = {};
 
   for (const effect of effects) {
-    const total = counts[effect.type];
+    const total = counts[effect.type] ?? 0;
     seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
     const idx = seenIdx[effect.type];
     const baseLabel = formatEffectType(effect.type);

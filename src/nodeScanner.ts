@@ -1,7 +1,7 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { VariableUsage } from './types';
-import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
+import type { VariableUsage } from './types';
+import { PROPERTY_NAMES, PROPERTY_MAPPING, EXTRACT_BINDING_MAX_DEPTH } from './constants';
 import { processedFontSizeNodeIds } from './dedup';
 import { logger } from './utils/logger';
 import { getLayerDisplayName } from './utils/displayName';
@@ -67,9 +67,13 @@ function getColorUsages(node: SceneNode, usages: VariableUsage[]): void {
 
   if (fillVariableIds.size > 0) {
     const firstId = Array.from(fillVariableIds)[0];
-    usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.FILL, id: firstId });
+    if (firstId) {
+      usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.FILL, id: firstId });
+    }
     if (fillVariableIds.size > 1) {
-      logger.log(`${node.name} has ${fillVariableIds.size} fill variables, only the first is shown`);
+      logger.log(
+        `${node.name} has ${fillVariableIds.size} fill variables, only the first is shown`,
+      );
     }
   }
 }
@@ -86,7 +90,11 @@ function getStrokeUsages(node: SceneNode, usages: VariableUsage[]): void {
     const paint = stroke as PaintWithBindings;
     const binding = paint.boundVariables?.color;
     if (binding?.id) {
-      usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.STROKE_COLOR, id: binding.id });
+      usages.push({
+        layer: getLayerDisplayName(node),
+        property: PROPERTY_NAMES.STROKE_COLOR,
+        id: binding.id,
+      });
     }
   }
 }
@@ -134,18 +142,19 @@ function getEffectUsages(node: SceneNode, usages: VariableUsage[]): void {
 
   for (const effect of effects) {
     if (!effect.boundVariables) continue;
-    const total = counts[effect.type];
+    const total = counts[effect.type] ?? 0;
     seenIdx[effect.type] = (seenIdx[effect.type] ?? 0) + 1;
     const idx = seenIdx[effect.type];
     const baseLabel = formatEffectType(effect.type);
     const effectGroup = total > 1 ? `${baseLabel} ${idx}` : baseLabel;
     for (const [prop, bind] of Object.entries(effect.boundVariables)) {
-      if ((bind as { id?: string }).id) {
+      const bindingId = extractIdFromBinding(bind);
+      if (bindingId) {
         const subProp = canonicalEffectSubProp(prop, effect.type);
         usages.push({
           layer: getLayerDisplayName(node),
           property: `${effectGroup} ${prop}`,
-          id: (bind as { id: string }).id,
+          id: bindingId,
           effectGroup,
           subProp,
         });
@@ -171,26 +180,43 @@ function getNodeBoundVariables(node: SceneNode, usages: VariableUsage[]): void {
 
   for (const [prop, bind] of Object.entries(nodeBV)) {
     if (skipProps.has(prop) || prop.startsWith('fills.')) continue;
-    const b = bind as { id?: string };
-    if (b.id) {
+    const bindingId = extractIdFromBinding(bind);
+    if (bindingId) {
       const displayName = PROPERTY_MAPPING[prop] ?? prop;
-      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: b.id });
+      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: bindingId });
     }
   }
 
   // Explicit check for asymmetric corner/stroke properties that may not appear in boundVariables
   const asymmetricProps = [
-    'topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius',
-    'strokeTopWeight', 'strokeBottomWeight', 'strokeLeftWeight', 'strokeRightWeight',
-  ];
+    'topLeftRadius',
+    'topRightRadius',
+    'bottomLeftRadius',
+    'bottomRightRadius',
+    'strokeTopWeight',
+    'strokeBottomWeight',
+    'strokeLeftWeight',
+    'strokeRightWeight',
+  ] as const;
+  const nodeRecord = node as unknown as Record<string, unknown>;
   for (const prop of asymmetricProps) {
-    const nodeAny = node as unknown as Record<string, unknown>;
-    const binding = (nodeBV as Record<string, { id?: string }>)[prop];
-    if (nodeAny[prop] !== undefined && binding?.id) {
+    const bindingValue = (nodeBV as Record<string, unknown>)[prop];
+    const bindingId = extractIdFromBinding(bindingValue);
+    if (nodeRecord[prop] !== undefined && bindingId) {
       const displayName = PROPERTY_MAPPING[prop] ?? prop;
-      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: binding.id });
+      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: bindingId });
     }
   }
+}
+
+/**
+ * Narrowly extracts a `string` id from an unknown binding shape. Returns
+ * `undefined` for null / non-object / shapes without a string id.
+ */
+function extractIdFromBinding(value: unknown): string | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const id = (value as { id?: unknown }).id;
+  return typeof id === 'string' ? id : undefined;
 }
 
 /**
@@ -215,9 +241,9 @@ function getTextNodeVariables(node: TextNode, usages: VariableUsage[]): void {
 
   // Pass 1: check each known font property directly
   for (const [propName, displayName] of Object.entries(fontProperties)) {
-    const binding = (txtBV as Record<string, { id?: string }>)[propName];
-    if (binding?.id) {
-      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: binding.id });
+    const bindingId = extractIdFromBinding((txtBV as Record<string, unknown>)[propName]);
+    if (bindingId) {
+      usages.push({ layer: getLayerDisplayName(node), property: displayName, id: bindingId });
       if (propName === 'fontSize') processedFontSizeNodeIds.add(node.id);
     }
   }
@@ -245,32 +271,53 @@ function getTextNodeVariables(node: TextNode, usages: VariableUsage[]): void {
 }
 
 /**
- * Recursively walks a `boundVariables` sub-object and collects all `{id}` bindings
+ * Iteratively walks a `boundVariables` sub-object and collects all `{id}` bindings
  * indexed by their dot-separated property path. Skips fill-related paths.
+ *
+ * A depth cap (`EXTRACT_BINDING_MAX_DEPTH`) and a visited-object set guard
+ * against pathological / cyclic structures so we never blow the call stack
+ * on a malformed plugin payload.
  *
  * @param obj - Object subtree to traverse.
  * @param result - Map from property path to list of variable IDs.
- * @param path - Current traversal path (used for recursion).
  */
-function extractBindingIds(
-  obj: Record<string, unknown>,
-  result: Record<string, string[]>,
-  path: string[] = [],
-): void {
+function extractBindingIds(obj: Record<string, unknown>, result: Record<string, string[]>): void {
   if (!obj || typeof obj !== 'object') return;
 
-  if (typeof (obj as { id?: unknown }).id === 'string') {
-    const propPath = path.join('.');
-    if (!propPath.startsWith('fills.') && propPath !== 'fills') {
-      if (!result[propPath]) result[propPath] = [];
-      result[propPath].push((obj as { id: string }).id);
-    }
-    return;
+  interface Frame {
+    value: unknown;
+    path: string[];
   }
+  const stack: Frame[] = [{ value: obj, path: [] }];
+  const visited = new WeakSet<object>();
 
-  for (const key of Object.keys(obj)) {
-    if (key === 'fills' || (path.length > 0 && path[0] === 'fills')) continue;
-    extractBindingIds(obj[key] as Record<string, unknown>, result, [...path, key]);
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (!frame) continue;
+    const { value, path } = frame;
+    if (value === null || typeof value !== 'object') continue;
+    if (path.length > EXTRACT_BINDING_MAX_DEPTH) continue;
+    if (visited.has(value as object)) continue;
+    visited.add(value as object);
+
+    const idCandidate = (value as { id?: unknown }).id;
+    if (typeof idCandidate === 'string') {
+      const propPath = path.join('.');
+      if (!propPath.startsWith('fills.') && propPath !== 'fills') {
+        const bucket = result[propPath] ?? [];
+        bucket.push(idCandidate);
+        result[propPath] = bucket;
+      }
+      continue;
+    }
+
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      if (key === 'fills' || (path.length > 0 && path[0] === 'fills')) continue;
+      stack.push({
+        value: (value as Record<string, unknown>)[key],
+        path: [...path, key],
+      });
+    }
   }
 }
 
@@ -315,7 +362,8 @@ export function collectAllNodes(nodes: readonly SceneNode[]): SceneNode[] {
   const result: SceneNode[] = [];
   const stack: SceneNode[] = [...nodes];
   while (stack.length > 0) {
-    const node = stack.pop()!;
+    const node = stack.pop();
+    if (!node) continue;
     result.push(node);
     if ('children' in node && Array.isArray((node as FrameNode).children)) {
       stack.push(...(node as FrameNode).children);

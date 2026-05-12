@@ -19,10 +19,12 @@ export function collectMergedAwayDescendantIds(
 
   for (const bucket of groups.values()) {
     if (bucket.length <= 1) continue;
-    if (bucket[0].type !== 'INSTANCE') continue;
+    const head = bucket[0];
+    if (!head || head.type !== 'INSTANCE') continue;
 
     for (let i = 1; i < bucket.length; i++) {
-      collectSubtreeIds(bucket[i], excluded);
+      const node = bucket[i];
+      if (node) collectSubtreeIds(node, excluded);
     }
   }
 
@@ -36,7 +38,8 @@ export function collectMergedAwayDescendantIds(
 function collectSubtreeIds(root: SceneNode, out: Set<string>): void {
   const stack: SceneNode[] = [root];
   while (stack.length > 0) {
-    const node = stack.pop()!;
+    const node = stack.pop();
+    if (!node) continue;
     out.add(node.id);
     const maybeChildren = (node as { children?: readonly SceneNode[] }).children;
     if (Array.isArray(maybeChildren)) {

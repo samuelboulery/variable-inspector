@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getUnboundColorUsages, getUnboundFloatUsages, getUnboundEffectUsages } from '../unboundDetector';
+import {
+  getUnboundColorUsages,
+  getUnboundFloatUsages,
+  getUnboundEffectUsages,
+} from '../unboundDetector';
 import { resetDedupSets } from '../dedup';
 import { UnboundUsage } from '../types';
 import { makeRectNode, makeTextNode, makeFrameNode } from '../__mocks__/figma';
@@ -30,7 +34,9 @@ describe('getUnboundColorUsages — fills', () => {
 
   it('does not report a fill that is bound to a variable', () => {
     const node = makeRectNode({
-      fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: { id: 'var-1' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: { id: 'var-1' } } },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundColorUsages(node, usages);
@@ -89,7 +95,9 @@ describe('getUnboundColorUsages — strokes', () => {
 
   it('does not report a stroke that is bound to a variable', () => {
     const node = makeRectNode({
-      strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'var-1' } } }],
+      strokes: [
+        { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'var-1' } } },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundColorUsages(node, usages);
@@ -286,11 +294,13 @@ describe('getUnboundEffectUsages', () => {
     const node = makeRectNode({
       id: 'n1',
       name: 'Card',
-      effects: [{
-        type: 'DROP_SHADOW',
-        radius: 0,
-        offset: { x: 4, y: 8 },
-      }],
+      effects: [
+        {
+          type: 'DROP_SHADOW',
+          radius: 0,
+          offset: { x: 4, y: 8 },
+        },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundEffectUsages(node, usages);
@@ -304,11 +314,13 @@ describe('getUnboundEffectUsages', () => {
   it('does not report effect properties that are bound to variables', () => {
     const node = makeRectNode({
       id: 'n1',
-      effects: [{
-        type: 'LAYER_BLUR',
-        radius: 10,
-        boundVariables: { radius: { id: 'var-blur' } },
-      }],
+      effects: [
+        {
+          type: 'LAYER_BLUR',
+          radius: 10,
+          boundVariables: { radius: { id: 'var-blur' } },
+        },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundEffectUsages(node, usages);
@@ -318,11 +330,13 @@ describe('getUnboundEffectUsages', () => {
   it('reports unbound shadow color', () => {
     const node = makeRectNode({
       id: 'n1',
-      effects: [{
-        type: 'DROP_SHADOW',
-        radius: 0,
-        color: { r: 0, g: 0, b: 0 },
-      }],
+      effects: [
+        {
+          type: 'DROP_SHADOW',
+          radius: 0,
+          color: { r: 0, g: 0, b: 0 },
+        },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundEffectUsages(node, usages);
@@ -353,12 +367,14 @@ describe('getUnboundEffectUsages', () => {
   it('skips offset.x when bound but reports offset.y when unbound', () => {
     const node = makeRectNode({
       id: 'n1',
-      effects: [{
-        type: 'DROP_SHADOW',
-        radius: 0,
-        offset: { x: 2, y: 4 },
-        boundVariables: { offset: { x: { id: 'var-x' } } },
-      }],
+      effects: [
+        {
+          type: 'DROP_SHADOW',
+          radius: 0,
+          offset: { x: 2, y: 4 },
+          boundVariables: { offset: { x: { id: 'var-x' } } },
+        },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundEffectUsages(node, usages);
@@ -446,13 +462,15 @@ describe('getUnboundEffectUsages — numbering repeated effects', () => {
   it('attaches unnumbered effectGroup for single effect of its type', () => {
     const node = makeRectNode({
       id: 'n1',
-      effects: [{
-        type: 'DROP_SHADOW',
-        radius: 4,
-        offset: { x: 2, y: 4 },
-        spread: 1,
-        color: { r: 0, g: 0, b: 0 },
-      }],
+      effects: [
+        {
+          type: 'DROP_SHADOW',
+          radius: 4,
+          offset: { x: 2, y: 4 },
+          spread: 1,
+          color: { r: 0, g: 0, b: 0 },
+        },
+      ],
     });
     const usages: UnboundUsage[] = [];
     getUnboundEffectUsages(node, usages);
@@ -520,14 +538,16 @@ describe('getUnboundFloatUsages — additional text properties', () => {
 // ---------------------------------------------------------------------------
 
 describe('getUnboundFloatUsages — spacing', () => {
-  function makeAutoLayoutFrame(overrides: {
-    paddingLeft?: number;
-    paddingRight?: number;
-    paddingTop?: number;
-    paddingBottom?: number;
-    itemSpacing?: number;
-    boundVariables?: Record<string, unknown>;
-  } = {}): SceneNode {
+  function makeAutoLayoutFrame(
+    overrides: {
+      paddingLeft?: number;
+      paddingRight?: number;
+      paddingTop?: number;
+      paddingBottom?: number;
+      itemSpacing?: number;
+      boundVariables?: Record<string, unknown>;
+    } = {},
+  ): SceneNode {
     return {
       id: 'al-1',
       name: 'AutoFrame',
@@ -542,7 +562,12 @@ describe('getUnboundFloatUsages — spacing', () => {
   }
 
   it('reports unbound padding on each side', () => {
-    const node = makeAutoLayoutFrame({ paddingLeft: 12, paddingRight: 16, paddingTop: 4, paddingBottom: 8 });
+    const node = makeAutoLayoutFrame({
+      paddingLeft: 12,
+      paddingRight: 16,
+      paddingTop: 4,
+      paddingBottom: 8,
+    });
     const usages: UnboundUsage[] = [];
     getUnboundFloatUsages(node, usages);
     const props = usages.map(u => u.property);
@@ -556,7 +581,9 @@ describe('getUnboundFloatUsages — spacing', () => {
     const node = makeAutoLayoutFrame({ itemSpacing: 10 });
     const usages: UnboundUsage[] = [];
     getUnboundFloatUsages(node, usages);
-    const gap = usages.find(u => u.property.toLowerCase().includes('gap') || u.property.toLowerCase().includes('item'));
+    const gap = usages.find(
+      u => u.property.toLowerCase().includes('gap') || u.property.toLowerCase().includes('item'),
+    );
     expect(gap).toBeDefined();
     expect(gap!.value).toBe('10');
   });
@@ -569,7 +596,10 @@ describe('getUnboundFloatUsages — spacing', () => {
   });
 
   it('skips paddingLeft when bound to a variable', () => {
-    const node = makeAutoLayoutFrame({ paddingLeft: 12, boundVariables: { paddingLeft: { id: 'var-pl' } } });
+    const node = makeAutoLayoutFrame({
+      paddingLeft: 12,
+      boundVariables: { paddingLeft: { id: 'var-pl' } },
+    });
     const usages: UnboundUsage[] = [];
     getUnboundFloatUsages(node, usages);
     expect(usages.find(u => u.property === 'Padding Left')).toBeUndefined();

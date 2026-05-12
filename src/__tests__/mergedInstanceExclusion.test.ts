@@ -7,11 +7,7 @@ interface NodeShape {
   children?: NodeShape[];
 }
 
-function makeNode(
-  id: string,
-  type: string,
-  children: NodeShape[] = [],
-): SceneNode {
+function makeNode(id: string, type: string, children: NodeShape[] = []): SceneNode {
   return { id, type, children } as unknown as SceneNode;
 }
 
@@ -56,7 +52,10 @@ describe('collectMergedAwayDescendantIds', () => {
   it('ignores non-INSTANCE buckets even if size > 1', () => {
     const a = makeNode('a', 'RECTANGLE');
     const b = makeNode('b', 'RECTANGLE');
-    const groups = new Map<string, SceneNode[]>([['__node__a', [a]], ['__node__b', [b]]]);
+    const groups = new Map<string, SceneNode[]>([
+      ['__node__a', [a]],
+      ['__node__b', [b]],
+    ]);
     const excluded = collectMergedAwayDescendantIds(groups);
     expect(excluded.size).toBe(0);
   });

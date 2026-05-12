@@ -25,7 +25,11 @@ describe('scanComponentProperties', () => {
     });
     const usages: VariableUsage[] = [];
     scanComponentProperties(node, usages);
-    expect(usages).toContainEqual({ layer: 'Button', property: 'Component / State', id: 'var-state' });
+    expect(usages).toContainEqual({
+      layer: 'Button',
+      property: 'Component / State',
+      id: 'var-state',
+    });
   });
 
   it('reports nothing when boundVariables.componentProperties is absent', () => {

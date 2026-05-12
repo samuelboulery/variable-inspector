@@ -52,7 +52,9 @@ function walkAncestorsForName(start: BaseNode | null, maxDepth: number): string 
 function resolveSublayerContainerName(rawName: string): string | null {
   const sublayerMatch = INSTANCE_SUBLAYER_ID.exec(rawName);
   if (!sublayerMatch) return null;
-  const container = figma.getNodeById(sublayerMatch[1]) as SceneNode | null;
+  const containerId = sublayerMatch[1];
+  if (!containerId) return null;
+  const container = figma.getNodeById(containerId) as SceneNode | null;
   if (!container) return null;
   if (!IS_FIGMA_ID.test(container.name)) return container.name;
   if (container.type === 'INSTANCE') {

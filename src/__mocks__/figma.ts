@@ -20,19 +20,29 @@ const figmaMock = {
   getNodeById: (_id: string): BaseNode | null => null,
   getNodeByIdAsync: async (_id: string): Promise<BaseNode | null> => null,
   ui: {
-    postMessage: (_msg: unknown): void => { /* stub */ },
-    resize: (_w: number, _h: number): void => { /* stub */ },
+    postMessage: (_msg: unknown): void => {
+      /* stub */
+    },
+    resize: (_w: number, _h: number): void => {
+      /* stub */
+    },
     onmessage: null as unknown,
   },
   viewport: {
-    scrollAndZoomIntoView: (_nodes: readonly BaseNode[]): void => { /* stub */ },
+    scrollAndZoomIntoView: (_nodes: readonly BaseNode[]): void => {
+      /* stub */
+    },
   },
-  on: (_event: string, _cb: () => void): void => { /* stub */ },
-  showUI: (_html: string, _opts?: ShowUIOptions): void => { /* stub */ },
+  on: (_event: string, _cb: () => void): void => {
+    /* stub */
+  },
+  showUI: (_html: string, _opts?: ShowUIOptions): void => {
+    /* stub */
+  },
 };
 
 // Expose as the `figma` global expected by plugin-thread code.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (globalThis as any).figma = figmaMock;
 
 export { figmaMock };
@@ -46,18 +56,20 @@ export type FigmaMock = typeof figmaMock;
  * Creates a minimal rectangle-shaped SceneNode stub for use in tests.
  * Override any property via the `overrides` argument.
  */
-export function makeRectNode(overrides: {
-  id?: string;
-  name?: string;
-  fills?: object[];
-  strokes?: object[];
-  effects?: object[];
-  opacity?: number;
-  cornerRadius?: number;
-  strokeWeight?: number;
-  boundVariables?: Record<string, unknown>;
-  children?: SceneNode[];
-} = {}): SceneNode {
+export function makeRectNode(
+  overrides: {
+    id?: string;
+    name?: string;
+    fills?: object[];
+    strokes?: object[];
+    effects?: object[];
+    opacity?: number;
+    cornerRadius?: number;
+    strokeWeight?: number;
+    boundVariables?: Record<string, unknown>;
+    children?: SceneNode[];
+  } = {},
+): SceneNode {
   return {
     id: overrides.id ?? 'node-rect-1',
     name: overrides.name ?? 'Rectangle',
@@ -75,13 +87,15 @@ export function makeRectNode(overrides: {
 /**
  * Creates a minimal frame-shaped SceneNode stub, optionally with children.
  */
-export function makeFrameNode(overrides: {
-  id?: string;
-  name?: string;
-  children?: SceneNode[];
-  fills?: object[];
-  boundVariables?: Record<string, unknown>;
-} = {}): SceneNode {
+export function makeFrameNode(
+  overrides: {
+    id?: string;
+    name?: string;
+    children?: SceneNode[];
+    fills?: object[];
+    boundVariables?: Record<string, unknown>;
+  } = {},
+): SceneNode {
   return {
     id: overrides.id ?? 'node-frame-1',
     name: overrides.name ?? 'Frame',
@@ -95,15 +109,17 @@ export function makeFrameNode(overrides: {
 /**
  * Creates a minimal TEXT SceneNode stub.
  */
-export function makeTextNode(overrides: {
-  id?: string;
-  name?: string;
-  boundVariables?: Record<string, unknown>;
-  fontSize?: number;
-  letterSpacing?: number;
-  lineHeight?: number;
-  paragraphSpacing?: number;
-} = {}): SceneNode {
+export function makeTextNode(
+  overrides: {
+    id?: string;
+    name?: string;
+    boundVariables?: Record<string, unknown>;
+    fontSize?: number;
+    letterSpacing?: number;
+    lineHeight?: number;
+    paragraphSpacing?: number;
+  } = {},
+): SceneNode {
   return {
     id: overrides.id ?? 'node-text-1',
     name: overrides.name ?? 'Label',

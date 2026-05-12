@@ -1,6 +1,6 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { VariableUsage } from './types';
+import type { VariableUsage } from './types';
 import { PROPERTY_NAMES } from './constants';
 import { getLayerDisplayName } from './utils/displayName';
 
@@ -44,7 +44,8 @@ export function scanLayoutGridColors(node: SceneNode, usages: VariableUsage[]): 
   if (!Array.isArray(grids)) return;
   for (const grid of grids) {
     const id = grid.boundVariables?.color?.id;
-    if (id) usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.GRID_COLOR, id });
+    if (id)
+      usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.GRID_COLOR, id });
   }
 }
 
@@ -65,6 +66,12 @@ export function scanTextDecoration(node: TextNode, usages: VariableUsage[]): voi
   if (!bv) return;
   const td = bv.textDecoration?.id;
   const tc = bv.textCase?.id;
-  if (td) usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.TEXT_DECORATION, id: td });
-  if (tc) usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.TEXT_CASE, id: tc });
+  if (td)
+    usages.push({
+      layer: getLayerDisplayName(node),
+      property: PROPERTY_NAMES.TEXT_DECORATION,
+      id: td,
+    });
+  if (tc)
+    usages.push({ layer: getLayerDisplayName(node), property: PROPERTY_NAMES.TEXT_CASE, id: tc });
 }

@@ -20,11 +20,14 @@ export function computeFingerprint(node: SceneNode): string | null {
     if (!inst.mainComponent) return null;
 
     const componentId = inst.mainComponent.id;
-    const setId = (inst.mainComponent.parent as { id?: string; type?: string } | null)?.type === 'COMPONENT_SET'
-      ? (inst.mainComponent.parent as { id: string }).id
-      : '';
+    const setId =
+      (inst.mainComponent.parent as { id?: string; type?: string } | null)?.type === 'COMPONENT_SET'
+        ? (inst.mainComponent.parent as { id: string }).id
+        : '';
     const props = JSON.stringify(sortObjectKeys(inst.componentProperties ?? {}));
-    const bound = JSON.stringify(sortObjectKeys((inst.boundVariables ?? {}) as Record<string, unknown>));
+    const bound = JSON.stringify(
+      sortObjectKeys((inst.boundVariables ?? {}) as Record<string, unknown>),
+    );
     return [componentId, setId, props, bound].join('|');
   } catch {
     // Defensive: any synchronous Figma API throw (deprecated mainComponent

@@ -4,8 +4,13 @@ import { FullUsageEntry } from '../../types';
 
 function entry(overrides: Partial<FullUsageEntry>): FullUsageEntry {
   return {
-    layer: 'L', layerId: 'l1', property: 'P',
-    name: 'n', type: 'COLOR', origin: 'local', id: 'v1',
+    layer: 'L',
+    layerId: 'l1',
+    property: 'P',
+    name: 'n',
+    type: 'COLOR',
+    origin: 'local',
+    id: 'v1',
     ...overrides,
   };
 }
@@ -13,7 +18,10 @@ function entry(overrides: Partial<FullUsageEntry>): FullUsageEntry {
 describe('regroupByProperty', () => {
   it('groups entries by property name', () => {
     const byLayer = {
-      l1: [entry({ layerId: 'l1', layer: 'A', property: 'Fill' }), entry({ layerId: 'l1', layer: 'A', property: 'Stroke Color' })],
+      l1: [
+        entry({ layerId: 'l1', layer: 'A', property: 'Fill' }),
+        entry({ layerId: 'l1', layer: 'A', property: 'Stroke Color' }),
+      ],
       l2: [entry({ layerId: 'l2', layer: 'B', property: 'Fill' })],
     };
     const result = regroupByProperty(byLayer);
@@ -43,10 +51,7 @@ describe('computeStats', () => {
 
   it('counts variables by origin and type', () => {
     const byLayer = {
-      l1: [
-        entry({ origin: 'local', type: 'COLOR' }),
-        entry({ origin: 'external', type: 'FLOAT' }),
-      ],
+      l1: [entry({ origin: 'local', type: 'COLOR' }), entry({ origin: 'external', type: 'FLOAT' })],
     };
     const s = computeStats(byLayer, [], 0);
     expect(s.totalVariables).toBe(2);
@@ -76,7 +81,9 @@ describe('filterUsages', () => {
     const a = entry({ type: 'COLOR' });
     const b = entry({ type: 'FLOAT' });
     expect(filterUsages([a, b], { search: '', types: ['COLOR'], origins: [] })).toHaveLength(1);
-    expect(filterUsages([a, b], { search: '', types: ['COLOR', 'FLOAT'], origins: [] })).toHaveLength(2);
+    expect(
+      filterUsages([a, b], { search: '', types: ['COLOR', 'FLOAT'], origins: [] }),
+    ).toHaveLength(2);
   });
 
   it('filters by origin when origins array is non-empty', () => {
@@ -88,6 +95,8 @@ describe('filterUsages', () => {
   it('combines filters with AND', () => {
     const a = entry({ layer: 'Card', type: 'COLOR', origin: 'local' });
     const b = entry({ layer: 'Card', type: 'FLOAT', origin: 'local' });
-    expect(filterUsages([a, b], { search: 'card', types: ['COLOR'], origins: ['local'] })).toHaveLength(1);
+    expect(
+      filterUsages([a, b], { search: 'card', types: ['COLOR'], origins: ['local'] }),
+    ).toHaveLength(1);
   });
 });

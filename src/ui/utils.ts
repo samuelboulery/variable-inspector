@@ -1,15 +1,18 @@
-import { FullUsageEntry, UnboundUsage, ScanStats } from '../types';
+import type { FullUsageEntry, UnboundUsage, ScanStats } from '../types';
 
 /**
  * Re-groups a layer-keyed usage map into a property-keyed map.
  * Each entry retains its layerId so the UI can still focus the layer on click.
  */
-export function regroupByProperty(byLayer: Record<string, FullUsageEntry[]>): Record<string, FullUsageEntry[]> {
+export function regroupByProperty(
+  byLayer: Record<string, FullUsageEntry[]>,
+): Record<string, FullUsageEntry[]> {
   const out: Record<string, FullUsageEntry[]> = {};
   for (const entries of Object.values(byLayer)) {
     for (const e of entries) {
-      if (!out[e.property]) out[e.property] = [];
-      out[e.property].push(e);
+      const bucket = out[e.property] ?? [];
+      bucket.push(e);
+      out[e.property] = bucket;
     }
   }
   return out;
@@ -62,12 +65,17 @@ export interface FilterState {
 export function filterUsages(entries: FullUsageEntry[], filter: FilterState): FullUsageEntry[] {
   const q = filter.search.trim().toLowerCase();
   return entries.filter(e => {
-    if (q && !(
-      e.layer.toLowerCase().includes(q) ||
-      e.property.toLowerCase().includes(q) ||
-      e.name.toLowerCase().includes(q)
-    )) return false;
-    if (filter.types.length > 0 && !filter.types.includes(e.type as FilterState['types'][number])) return false;
+    if (
+      q &&
+      !(
+        e.layer.toLowerCase().includes(q) ||
+        e.property.toLowerCase().includes(q) ||
+        e.name.toLowerCase().includes(q)
+      )
+    )
+      return false;
+    if (filter.types.length > 0 && !filter.types.includes(e.type as FilterState['types'][number]))
+      return false;
     if (filter.origins.length > 0 && !filter.origins.includes(e.origin)) return false;
     return true;
   });

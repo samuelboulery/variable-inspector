@@ -1,10 +1,9 @@
 /// <reference types="@figma/plugin-typings" />
 
-import { UnboundUsage } from './types';
+import type { UnboundUsage } from './types';
 import { PROPERTY_NAMES, PROPERTY_MAPPING } from './constants';
 import { trackProperty } from './dedup';
 import { processedFontSizeNodeIds } from './dedup';
-import { formatEffectType } from './nodeScanner';
 import { getLayerDisplayName } from './utils/displayName';
 import { logger } from './utils/logger';
 
@@ -64,7 +63,9 @@ export function getUnboundColorUsages(node: SceneNode, unboundUsages: UnboundUsa
         value: rgbString(firstUnbound),
       });
       if (node.strokes.length > 1) {
-        logger.log(`${node.name} has ${node.strokes.length} strokes, only the first unbound one is shown`);
+        logger.log(
+          `${node.name} has ${node.strokes.length} strokes, only the first unbound one is shown`,
+        );
       }
     }
   }
@@ -107,7 +108,12 @@ function getUnboundStrokeWeightUsages(node: NodeWithBindings, unboundUsages: Unb
     'strokeLeftWeight' in node ||
     'strokeRightWeight' in node;
 
-  if (typeof sw === 'number' && sw !== 0 && !node.boundVariables?.strokeWeight?.id && !hasAsymmetric) {
+  if (
+    typeof sw === 'number' &&
+    sw !== 0 &&
+    !node.boundVariables?.strokeWeight?.id &&
+    !hasAsymmetric
+  ) {
     if (!trackProperty(node.id, PROPERTY_NAMES.STROKE_WEIGHT)) {
       unboundUsages.push({
         layer: getLayerDisplayName(node),
@@ -118,14 +124,24 @@ function getUnboundStrokeWeightUsages(node: NodeWithBindings, unboundUsages: Unb
     }
   }
 
-  for (const prop of ['strokeTopWeight', 'strokeBottomWeight', 'strokeLeftWeight', 'strokeRightWeight'] as const) {
+  for (const prop of [
+    'strokeTopWeight',
+    'strokeBottomWeight',
+    'strokeLeftWeight',
+    'strokeRightWeight',
+  ] as const) {
     if (!(prop in node)) continue;
     const weight = node[prop] as number | undefined;
     if (typeof weight !== 'number' || weight === 0) continue;
     if (node.boundVariables?.[prop]?.id) continue;
     const displayName = PROPERTY_MAPPING[prop] ?? prop;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(weight) });
+      unboundUsages.push({
+        layer: getLayerDisplayName(node),
+        layerId: node.id,
+        property: displayName,
+        value: fmt(weight),
+      });
     }
   }
 }
@@ -158,14 +174,24 @@ function getUnboundCornerRadiusUsages(node: NodeWithBindings, unboundUsages: Unb
     }
   }
 
-  for (const prop of ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const) {
+  for (const prop of [
+    'topLeftRadius',
+    'topRightRadius',
+    'bottomLeftRadius',
+    'bottomRightRadius',
+  ] as const) {
     if (!(prop in node)) continue;
     const radius = node[prop] as number | undefined;
     if (typeof radius !== 'number' || radius === 0) continue;
     if (node.boundVariables?.[prop]?.id) continue;
     const displayName = PROPERTY_MAPPING[prop] ?? prop;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(radius) });
+      unboundUsages.push({
+        layer: getLayerDisplayName(node),
+        layerId: node.id,
+        property: displayName,
+        value: fmt(radius),
+      });
     }
   }
 }
@@ -182,7 +208,11 @@ function getUnboundTextPropertyUsages(node: NodeWithBindings, unboundUsages: Unb
     { key: 'fontSize', displayName: PROPERTY_NAMES.FONT_SIZE, skipIfProcessed: true },
     { key: 'letterSpacing', displayName: PROPERTY_NAMES.LETTER_SPACING, skipIfProcessed: false },
     { key: 'lineHeight', displayName: PROPERTY_NAMES.LINE_HEIGHT, skipIfProcessed: false },
-    { key: 'paragraphSpacing', displayName: PROPERTY_NAMES.PARAGRAPH_SPACING, skipIfProcessed: false },
+    {
+      key: 'paragraphSpacing',
+      displayName: PROPERTY_NAMES.PARAGRAPH_SPACING,
+      skipIfProcessed: false,
+    },
   ];
 
   for (const { key, displayName, skipIfProcessed } of textProperties) {
@@ -191,7 +221,12 @@ function getUnboundTextPropertyUsages(node: NodeWithBindings, unboundUsages: Unb
     if (typeof value !== 'number' || value === 0) continue;
     if (node.boundVariables?.[key]?.id) continue;
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(value) });
+      unboundUsages.push({
+        layer: getLayerDisplayName(node),
+        layerId: node.id,
+        property: displayName,
+        value: fmt(value),
+      });
     }
   }
 }
@@ -216,7 +251,12 @@ function getUnboundSpacingUsages(node: NodeWithBindings, unboundUsages: UnboundU
     if (node.boundVariables?.[key]?.id) continue;
     logger.log(`Found spacing property ${key} = ${value} on node ${node.name}`);
     if (!trackProperty(node.id, displayName)) {
-      unboundUsages.push({ layer: getLayerDisplayName(node), layerId: node.id, property: displayName, value: fmt(value) });
+      unboundUsages.push({
+        layer: getLayerDisplayName(node),
+        layerId: node.id,
+        property: displayName,
+        value: fmt(value),
+      });
     }
   }
 }

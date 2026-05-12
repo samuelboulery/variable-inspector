@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { scanDimensionConstraints, scanLayoutGridColors, scanVisibility, scanTextDecoration } from '../propertyScanner';
+import {
+  scanDimensionConstraints,
+  scanLayoutGridColors,
+  scanVisibility,
+  scanTextDecoration,
+} from '../propertyScanner';
 import { VariableUsage } from '../types';
 import { makeRectNode, makeFrameNode, makeTextNode } from '../__mocks__/figma';
 
@@ -36,7 +41,13 @@ describe('scanLayoutGridColors — bound', () => {
   it('reports a bound layout-grid color', () => {
     const node = {
       ...makeFrameNode({ id: 'f1', name: 'Page' }),
-      layoutGrids: [{ pattern: 'GRID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: { id: 'var-grid' } } }],
+      layoutGrids: [
+        {
+          pattern: 'GRID',
+          color: { r: 1, g: 0, b: 0 },
+          boundVariables: { color: { id: 'var-grid' } },
+        },
+      ],
     } as unknown as SceneNode;
     const usages: VariableUsage[] = [];
     scanLayoutGridColors(node, usages);
@@ -46,7 +57,11 @@ describe('scanLayoutGridColors — bound', () => {
 
 describe('scanVisibility — bound', () => {
   it('reports a bound visible binding', () => {
-    const node = makeRectNode({ id: 'r1', name: 'Maybe', boundVariables: { visible: { id: 'var-vis' } } });
+    const node = makeRectNode({
+      id: 'r1',
+      name: 'Maybe',
+      boundVariables: { visible: { id: 'var-vis' } },
+    });
     const usages: VariableUsage[] = [];
     scanVisibility(node, usages);
     expect(usages).toContainEqual({ layer: 'Maybe', property: 'Visible', id: 'var-vis' });
@@ -55,7 +70,9 @@ describe('scanVisibility — bound', () => {
 
 describe('scanTextDecoration — bound', () => {
   it('reports textDecoration and textCase bindings on TextNode', () => {
-    const node = makeTextNode({ id: 't1', name: 'Heading' }) as unknown as TextNode & { boundVariables?: Record<string, { id: string }> };
+    const node = makeTextNode({ id: 't1', name: 'Heading' }) as unknown as TextNode & {
+      boundVariables?: Record<string, { id: string }>;
+    };
     (node as unknown as { boundVariables: Record<string, { id: string }> }).boundVariables = {
       textDecoration: { id: 'var-td' },
       textCase: { id: 'var-tc' },

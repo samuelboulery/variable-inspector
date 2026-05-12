@@ -38,7 +38,7 @@ describe('loadVariables — local collections', () => {
       valuesByMode: { 'mode-1': { r: 1, g: 0, b: 0 } as unknown as VariableValue },
     });
     figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection(['var-1'])];
-    figmaMock.variables.getVariableByIdAsync = async (id) => (id === 'var-1' ? variable : null);
+    figmaMock.variables.getVariableByIdAsync = async id => (id === 'var-1' ? variable : null);
 
     const result = await loadVariables();
     const def = result.get('var-1');
@@ -56,7 +56,9 @@ describe('loadVariables — local collections', () => {
       resolvedType: 'FLOAT',
       valuesByMode: { 'mode-1': 16 as unknown as VariableValue },
     });
-    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection(['var-spacing'])];
+    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [
+      makeCollection(['var-spacing']),
+    ];
     figmaMock.variables.getVariableByIdAsync = async () => variable;
 
     const result = await loadVariables();
@@ -66,7 +68,9 @@ describe('loadVariables — local collections', () => {
   });
 
   it('skips variables that resolve to null (unpublished external lib)', async () => {
-    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection(['ghost-id'])];
+    figmaMock.variables.getLocalVariableCollectionsAsync = async () => [
+      makeCollection(['ghost-id']),
+    ];
     figmaMock.variables.getVariableByIdAsync = async () => null;
 
     const result = await loadVariables();
@@ -74,13 +78,24 @@ describe('loadVariables — local collections', () => {
   });
 
   it('handles multiple collections with multiple variables', async () => {
-    const v1 = makeVariable({ id: 'a', name: 'a', resolvedType: 'COLOR', valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue } });
-    const v2 = makeVariable({ id: 'b', name: 'b', resolvedType: 'FLOAT', valuesByMode: { m: 4 as unknown as VariableValue } });
+    const v1 = makeVariable({
+      id: 'a',
+      name: 'a',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue },
+    });
+    const v2 = makeVariable({
+      id: 'b',
+      name: 'b',
+      resolvedType: 'FLOAT',
+      valuesByMode: { m: 4 as unknown as VariableValue },
+    });
     figmaMock.variables.getLocalVariableCollectionsAsync = async () => [
       makeCollection(['a']),
       makeCollection(['b']),
     ];
-    figmaMock.variables.getVariableByIdAsync = async (id) => (id === 'a' ? v1 : id === 'b' ? v2 : null);
+    figmaMock.variables.getVariableByIdAsync = async id =>
+      id === 'a' ? v1 : id === 'b' ? v2 : null;
 
     const result = await loadVariables();
     expect(result.size).toBe(2);
@@ -99,11 +114,13 @@ describe('loadVariables — external (library) variables', () => {
     });
     const node = makeRectNode({
       id: 'rect-1',
-      fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 1 }, boundVariables: { color: { id: 'ext-1' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 0, g: 0, b: 1 }, boundVariables: { color: { id: 'ext-1' } } },
+      ],
     });
     figmaMock.currentPage.selection = [node];
     figmaMock.variables.getLocalVariableCollectionsAsync = async () => [];
-    figmaMock.variables.getVariableByIdAsync = async (id) => (id === 'ext-1' ? externalVar : null);
+    figmaMock.variables.getVariableByIdAsync = async id => (id === 'ext-1' ? externalVar : null);
 
     const result = await loadVariables();
     const def = result.get('ext-1');
@@ -113,11 +130,25 @@ describe('loadVariables — external (library) variables', () => {
   });
 
   it('overrides the fallback name with the published-import name when available', async () => {
-    const fallback = makeVariable({ id: 'ext-1', name: 'fallback-name', key: 'k1', resolvedType: 'COLOR', valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue } });
-    const imported = makeVariable({ id: 'ext-1', name: 'imported-name', key: 'k1', resolvedType: 'COLOR', valuesByMode: { m: { r: 0, g: 1, b: 0 } as unknown as VariableValue } });
+    const fallback = makeVariable({
+      id: 'ext-1',
+      name: 'fallback-name',
+      key: 'k1',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue },
+    });
+    const imported = makeVariable({
+      id: 'ext-1',
+      name: 'imported-name',
+      key: 'k1',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 0, g: 1, b: 0 } as unknown as VariableValue },
+    });
     const node = makeRectNode({
       id: 'rect-1',
-      fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'ext-1' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'ext-1' } } },
+      ],
     });
     figmaMock.currentPage.selection = [node];
     figmaMock.variables.getVariableByIdAsync = async () => fallback;
@@ -128,10 +159,18 @@ describe('loadVariables — external (library) variables', () => {
   });
 
   it('keeps the fallback when importVariableByKeyAsync returns null', async () => {
-    const fallback = makeVariable({ id: 'ext-1', name: 'fallback', key: 'k1', resolvedType: 'COLOR', valuesByMode: { m: { r: 1, g: 1, b: 1 } as unknown as VariableValue } });
+    const fallback = makeVariable({
+      id: 'ext-1',
+      name: 'fallback',
+      key: 'k1',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 1, g: 1, b: 1 } as unknown as VariableValue },
+    });
     const node = makeRectNode({
       id: 'rect-1',
-      fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, boundVariables: { color: { id: 'ext-1' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 1, g: 1, b: 1 }, boundVariables: { color: { id: 'ext-1' } } },
+      ],
     });
     figmaMock.currentPage.selection = [node];
     figmaMock.variables.getVariableByIdAsync = async () => fallback;
@@ -142,10 +181,18 @@ describe('loadVariables — external (library) variables', () => {
   });
 
   it('survives an importVariableByKeyAsync that throws', async () => {
-    const fallback = makeVariable({ id: 'ext-1', name: 'fallback', key: 'k1', resolvedType: 'COLOR', valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue } });
+    const fallback = makeVariable({
+      id: 'ext-1',
+      name: 'fallback',
+      key: 'k1',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue },
+    });
     const node = makeRectNode({
       id: 'rect-1',
-      fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'ext-1' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'ext-1' } } },
+      ],
     });
     figmaMock.currentPage.selection = [node];
     figmaMock.variables.getVariableByIdAsync = async () => fallback;
@@ -159,10 +206,17 @@ describe('loadVariables — external (library) variables', () => {
   });
 
   it('skips IDs already loaded as local (no double fetch)', async () => {
-    const local = makeVariable({ id: 'shared', name: 'local-name', resolvedType: 'COLOR', valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue } });
+    const local = makeVariable({
+      id: 'shared',
+      name: 'local-name',
+      resolvedType: 'COLOR',
+      valuesByMode: { m: { r: 0, g: 0, b: 0 } as unknown as VariableValue },
+    });
     const node = makeRectNode({
       id: 'rect-1',
-      fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'shared' } } }],
+      fills: [
+        { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { id: 'shared' } } },
+      ],
     });
     figmaMock.currentPage.selection = [node];
     figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection(['shared'])];
@@ -214,7 +268,11 @@ describe('resolveColorValue (via loadVariables)', () => {
   });
 
   it('returns undefined when the first mode value is a VARIABLE_ALIAS (chain not auto-resolved)', async () => {
-    const { root, resolve } = makeAliasChain({ rootId: 'a', leafId: 'b', leafValue: { r: 0, g: 0, b: 0 } });
+    const { root, resolve } = makeAliasChain({
+      rootId: 'a',
+      leafId: 'b',
+      leafValue: { r: 0, g: 0, b: 0 },
+    });
     figmaMock.variables.getLocalVariableCollectionsAsync = async () => [makeCollection(['a'])];
     figmaMock.variables.getVariableByIdAsync = resolve;
 

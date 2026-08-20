@@ -10,21 +10,21 @@ Variable Inspector is a Figma plugin that helps designers audit the variable (de
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Dev mode (watch + rebuild on save)
-npm run dev
+pnpm run dev
 
 # Production build
-npm run build
+pnpm run build
 
 # TypeScript check (no emit)
-npm run typecheck
+pnpm run typecheck
 
 # Tests
-npm run test          # one-shot
-npm run test:watch    # watch mode
-npm run test:cov      # with coverage
+pnpm run test          # one-shot
+pnpm run test:watch    # watch mode
+pnpm run test:cov      # with coverage
 ```
 
 Build output goes to `dist/`. Load the plugin in Figma via **Plugins → Development → Import plugin from manifest** pointing to `dist/manifest.json`.
@@ -99,8 +99,8 @@ Clicking a layer header zooms + selects via `figma.viewport.scrollAndZoomIntoVie
 Tests live in `src/__tests__/` and use **Vitest**.
 
 ```bash
-npm run test        # run all tests
-npm run test:watch  # watch mode
+pnpm run test        # run all tests
+pnpm run test:watch  # watch mode
 ```
 
 Every utility function in the plugin-thread modules (`nodeScanner.ts`, `unboundDetector.ts`, `dedup.ts`, `variableLoader.ts`) must have a unit test. Mock the Figma API with the `@figma/plugin-typings` types + the local `__mocks__/figma.ts` file. Target ≥ 80 % coverage on `src/` (UI files exempt).
@@ -140,7 +140,7 @@ Prefixes: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.
 - `boundVariables` for effects is an array — iterate over each effect, not just index 0.
 - Avoid synchronous Figma API calls — the async variants are always preferred.
 - Figma plugin thread has no access to `window`, `document`, or the DOM.
-- `dist/code.js` and `dist/manifest.json` are tracked in git for plugin distribution — `npm run build` rewrites them, commit the result.
+- `dist/code.js` and `dist/manifest.json` are tracked in git for plugin distribution — `pnpm run build` rewrites them, commit the result.
 
 ## graphify (knowledge graph)
 

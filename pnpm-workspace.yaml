@@ -1,0 +1,19 @@
+# Ce dépôt n'est pas un monorepo : pas de champ `packages`. Ce fichier existe
+# parce que depuis pnpm 10.16 les réglages vivent ici, et non plus dans `.npmrc`
+# ni dans le champ `pnpm` de package.json — que pnpm 11 ignore désormais tout à
+# fait, en le signalant.
+
+# pnpm bloque par défaut les scripts d'installation des dépendances. C'est une
+# protection, pas une gêne : c'est le vecteur qu'a emprunté le ver ChainDrop. On
+# autorise donc nommément, et uniquement, ce qui en a réellement besoin.
+#
+# La clé s'appelle `allowBuilds` depuis pnpm 11. `onlyBuiltDependencies` est
+# encore lu et affiché par `pnpm config list`, mais n'autorise plus rien :
+# l'installation échoue alors sur ERR_PNPM_IGNORED_BUILDS sans dire pourquoi.
+allowBuilds:
+  esbuild: true
+
+# Quarantaine de 24 heures sur toute version fraîchement publiée. Les vers npm
+# font leurs dégâts dans les premières heures, avant que le paquet ne soit retiré
+# du registre. Ce délai laisse le retrait arriver avant nous.
+minimumReleaseAge: 1440

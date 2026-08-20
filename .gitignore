@@ -3,6 +3,10 @@ node_modules/
 npm-debug.log*
 .vscode/
 
+# Un seul lockfile, celui de pnpm — un package-lock.json signalerait un
+# `npm install` qui a contourné le garde pnpm de ce dépôt.
+package-lock.json
+
 # Knowledge graph (rebuilt locally, never versioned)
 graphify-out/
 
